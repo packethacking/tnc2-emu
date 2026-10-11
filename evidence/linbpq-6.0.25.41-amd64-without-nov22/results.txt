@@ -1,0 +1,11 @@
+LinBPQ image m0lte/linbpq:latest (6.0.25.41), NOV2.2 route off, emulator image ghcr.io/packethacking/tnc2-emu:latest, run at 2026-10-11T23:03:18Z
+PASS: TheNet console connects CONNECTED to
+PASS: TheNet PARMS answers (radio quality 192 and broadcast interval 60 s, as patched)
+PASS: LinBPQ lists TheNet as a neighbour with a node behind it (ROUTES) 
+PASS: LinBPQ lists TheNet as a node (NODES) 
+PASS: TheNet lists LinBPQ in NODES 
+FAIL: LinBPQ node link to TheNet comes up XID frames sent to TheNet: 23, UA from TheNet: 0
+PASS: L2 connect LinBPQ -> TheNet callsign gets TheNet prompt prompt 'TNET:G9TNT-1}': True, SABM from G9ABC on the wire: True
+FAIL: NET/ROM connect LinBPQ -> TheNet alias no connect: 'BPQNOD:G9BPQ} Error - Node TNET:G9TNT-1 has disappeared'
+PASS: NET/ROM connect TheNet -> LinBPQ alias LinBPQ prompt: True, CONN REQ/ACK on the wire: True
+PASS: L2 downlink TheNet -> LinBPQ port callsign UA from G9BPQ-2 on the wire: True, LinBPQ prompt: True

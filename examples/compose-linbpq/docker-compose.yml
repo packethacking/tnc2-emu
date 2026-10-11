@@ -1,0 +1,54 @@
+# A 1990s TheNet X1J node and a modern LinBPQ node, linked over TCP KISS.
+#
+#   docker compose up -d
+#   nc localhost 8002        TheNet console: press Escape, then C and Enter
+#   telnet localhost 8010    LinBPQ: log in as sysop, password changeme
+#
+# About a minute after start each node lists the other in NODES (TheNet sends its
+# first broadcast a minute after power on, then every 5 minutes here). From
+# LinBPQ try "C TNET"; from TheNet try "C BPQNOD".
+#
+# The TheNet console uses host port 8002, as in the XRouter example, so stop
+# that one first ("docker compose down" in examples/compose).
+#
+# Change the callsigns below to your own before linking either node to a real network.
+
+name: tnc2-linbpq-example
+
+services:
+  thenet:
+    image: ghcr.io/packethacking/tnc2-emu:${TNC2_TAG:-latest}
+    environment:
+      TNC2_CALL: G9TNT-1
+      TNC2_ALIAS: TNET
+      # PARMS 3 (radio port quality) = 192 and PARMS 7 (NODES interval) = 300 s
+      TNC2_POKE: "4C=C0,00;54=2C,01"
+    volumes:
+      - thenet-data:/data
+    ports:
+      - "127.0.0.1:8002:8002"
+    networks:
+      radio:
+        ipv4_address: 172.29.75.10
+
+  linbpq:
+    image: m0lte/linbpq:${LINBPQ_TAG:-latest}
+    depends_on: [thenet]
+    volumes:
+      - linbpq-data:/data
+      - ./bpq32.cfg:/data/bpq32.cfg:ro
+    ports:
+      - "127.0.0.1:8010:8010"
+    networks:
+      radio:
+        ipv4_address: 172.29.75.12
+
+volumes:
+  thenet-data:
+  linbpq-data:
+
+networks:
+  radio:
+    ipam:
+      config:
+        - subnet: 172.29.75.0/24

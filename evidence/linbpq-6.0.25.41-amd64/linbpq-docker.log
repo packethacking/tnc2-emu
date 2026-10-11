@@ -1,0 +1,15 @@
+G8BPQ AX25 Packet Switch System Version 6.0.25.41 September 2026
+Copyright � 2001-2026 John Wiseman G8BPQ
+208Current Directory is /data
+Log Directory is /data
+Making Directory /data/logs
+Configuration file Preprocessor.
+Using Configuration file /data/bpq32.cfg
+Conversion (probably) successful
+
+PORTS 0x59dd2b5a5560 LINKS 0x59dd2b5a7640 DESTS 0x59dd2b5aee40 ROUTES 0x59dd2b5bb960 L4 0x59dd2b5bed60 BUFFERS 0x59dd2b5ca168
+
+Route/Node recovery file BPQNODES.dat not found - Continuing without it
+Initialising Port 01     Telnet Server 
+Initialising Port 02     TCPKISS IP 172.29.76.10 Port 8001 Chan A 
+MQTT Enabled 0

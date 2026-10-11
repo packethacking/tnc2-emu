@@ -1,0 +1,95 @@
+
+[2026-10-11T22:52:40Z new telnet session]
+user:
+[2026-10-11T22:52:40Z >>> sysop]
+password:
+[2026-10-11T22:52:40Z >>> changeme]
+
+Connected to G9BPQ's Telnet Server
+
+
+[2026-10-11T22:52:41Z >>> VERSION]
+BPQNOD:G9BPQ} Version 6.0.25.41 (64 bit)
+
+[2026-10-11T22:52:43Z >>> PORTS]
+BPQNOD:G9BPQ} Ports
+  1 Telnet                        
+  2 TheNet TNC2                   
+
+[2026-10-11T22:53:05Z >>> ROUTES]
+BPQNOD:G9BPQ} Routes
+  2 G9TNT-1   192 0!
+
+[2026-10-11T22:53:07Z >>> NODES]
+BPQNOD:G9BPQ} Nodes
+
+[2026-10-11T22:53:11Z >>> LINKS]
+BPQNOD:G9BPQ} Links
+
+[2026-10-11T22:53:34Z >>> ROUTES]
+BPQNOD:G9BPQ} Routes
+  2 G9TNT-1   192 1!
+
+[2026-10-11T22:53:36Z >>> NODES]
+BPQNOD:G9BPQ} Nodes
+TNET:G9TNT-1        
+
+[2026-10-11T22:53:40Z >>> LINKS]
+BPQNOD:G9BPQ} Links
+G9TNT-1   G9BPQ      S=5 P=2 T=3 V=2 Q=0
+
+[2026-10-11T22:53:44Z >>> NODES TNET]
+BPQNOD:G9BPQ} Routes to: TNET:G9TNT-1
+  192 5 2 G9TNT-1
+
+[2026-10-11T22:53:46Z >>> C 2 !G9TNT-1]
+BPQNOD:G9BPQ} Connected to G9TNT-1
+
+[2026-10-11T22:53:50Z >>> NODES]
+TNET:G9TNT-1} Nodes:
+BPQNOD:G9BPQ       
+
+[2026-10-11T22:53:55Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+*** Disconnected from Stream 1
+Disconnected from Node - Telnet Session kept
+
+[2026-10-11T22:54:03Z new telnet session]
+user:
+[2026-10-11T22:54:03Z >>> sysop]
+password:
+[2026-10-11T22:54:03Z >>> changeme]
+
+Connected to G9BPQ's Telnet Server
+
+
+[2026-10-11T22:54:04Z >>> C TNET]
+BPQNOD:G9BPQ} Connected to TNET:G9TNT-1
+
+[2026-10-11T22:54:09Z >>> ROUTES]
+TNET:G9TNT-1} Routes:
+> 0 BPQNOD:G9BPQ 192 1
+
+[2026-10-11T22:54:16Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+
+[2026-10-11T22:54:23Z new telnet session]
+user:
+[2026-10-11T22:54:23Z >>> sysop]
+password:
+[2026-10-11T22:54:23Z >>> changeme]
+
+Connected to G9BPQ's Telnet Server
+
+
+[2026-10-11T22:55:24Z >>> NODES]
+BPQNOD:G9BPQ} Nodes
+TNET:G9TNT-1        
+
+[2026-10-11T22:55:26Z >>> ROUTES]
+BPQNOD:G9BPQ} Routes
+> 2 G9TNT-1   192 1!
+
+[2026-10-11T22:55:28Z >>> LINKS]
+BPQNOD:G9BPQ} Links
+G9TNT-1   G9BPQ      S=5 P=2 T=3 V=2 Q=0

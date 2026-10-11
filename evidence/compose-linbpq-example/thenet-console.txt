@@ -1,0 +1,10 @@
+* C
+
+CONNECTED to G9TNT-1
+C BPQNOD
+TNET:G9TNT-1} Connected to BPQNOD:G9BPQ
+NODES
+BPQNOD:G9BPQ} Nodes
+TNET:G9TNT-1        
+BYE
+TNET:G9TNT-1} Welcome back.

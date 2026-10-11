@@ -43,6 +43,30 @@ telnet localhost 8023      # XRouter, log in with any callsign
 After a few minutes each lists the other in `NODES`. From XRouter try
 `C TNET`, from TheNet try `C XRNODE`.
 
+### TheNet and LinBPQ together
+
+`examples/compose-linbpq` does the same with a LinBPQ node, using the `m0lte/linbpq` image:
+
+```sh
+cd examples/compose-linbpq
+docker compose up -d
+nc localhost 8002          # TheNet
+telnet localhost 8010      # LinBPQ, user sysop, password changeme
+```
+
+Both examples put TheNet's console on port 8002, so stop the XRouter one first (`docker compose down` in `examples/compose`). About a minute after start each node lists the other in `NODES`. From LinBPQ try `C TNET` (NET/ROM) or `C 2 !G9TNT-1` (a plain level 2 connect on port 2; without the `!` LinBPQ goes over NET/ROM, because G9TNT-1 is in its `NODES`), from TheNet try `C BPQNOD`. A LinBPQ session looks like this:
+
+```
+NODES
+BPQNOD:G9BPQ} Nodes
+TNET:G9TNT-1
+C TNET
+BPQNOD:G9BPQ} Connected to TNET:G9TNT-1
+NODES
+TNET:G9TNT-1} Nodes:
+BPQNOD:G9BPQ
+```
+
 ## Linking it to your own node
 
 The emulator is a KISS TCP server on port 8001. Point your node's TCP KISS
@@ -51,17 +75,42 @@ client at it:
 - XRouter: an `INTERFACE` with `TYPE=TCP`, `PROTOCOL=KISS`,
   `IOADDR=<emulator IP>`, `INTNUM=8001`, and a `PORT` on it (see
   `examples/compose/XROUTER.CFG`).
-- BPQ: a KISS port with `TYPE=ASYNC`, `PROTOCOL=KISS` and
-  `IPADDR`/`TCPPORT` pointing at the emulator.
+- LinBPQ: a `PORT` with `TYPE=ASYNC`, `PROTOCOL=KISS`, `IPADDR=<emulator IP>` and `TCPPORT=8001`, plus a `ROUTES` entry for the TheNet node with `NOV2.2=1` (see below and `examples/compose-linbpq/bpq32.cfg`).
 - Direwolf, or anything else with a TCP KISS client: same idea.
 
-Only XRouter has been tested so far.
+XRouter and LinBPQ have been tested; Direwolf and others have not.
 
 Frames are passed whole, as if over a perfect 1200 bit/s radio channel. The
 node's NODES broadcast interval defaults to 30 minutes, and its radio port
 quality to 10, which is too low to learn routes; most people will want
 `TNC2_POKE="4C=C0,00"` (quality 192) and perhaps `54=2C,01` (broadcast every
 300 seconds).
+
+### LinBPQ needs `NOV2.2=1`
+
+LinBPQ opens its node to node links with an AX.25 2.2 XID frame. TheNet is an AX.25 2.0 node and ignores XID, and LinBPQ gives up on a neighbour that stays silent instead of falling back to a plain connect. Without the fix TheNet can drop out of LinBPQ's `NODES`, and `C TNET` from LinBPQ fails with `Error - Node TNET:G9TNT-1 has disappeared`. Level 2 connects (`C 2 !G9TNT-1`) and connects from TheNet to LinBPQ still work. Tell LinBPQ to use AX.25 2.0 with that neighbour. From `examples/compose-linbpq/bpq32.cfg`, where `172.29.75.10` is the emulator:
+
+```
+PORT
+ ID=TheNet TNC2
+ TYPE=ASYNC
+ PROTOCOL=KISS
+ IPADDR=172.29.75.10
+ TCPPORT=8001
+ QUALITY=192
+ MAXFRAME=2
+ PACLEN=120
+ FRACK=8000
+ RESPTIME=1500
+ RETRIES=10
+ENDPORT
+
+ROUTES:
+CALL=G9TNT-1,PORT=2,QUALITY=192,NOV2.2=1
+***
+```
+
+`CALL` is the TheNet node's callsign and `PORT` is the number of the KISS port above (the second `PORT` block in the example, after Telnet). With that in place LinBPQ connects with a plain SABM and the link comes straight up.
 
 ## Settings
 
@@ -97,6 +146,7 @@ sysop console, survives restarts.
   level 2 and over NET/ROM, and TheNet connects to XRouter over NET/ROM and
   by a level 2 downlink. Raw transcripts and frame captures are in
   `evidence/`.
+- Tested against LinBPQ 6.0.25.41 (`m0lte/linbpq`) with `interop/run_linbpq.py`: the same checks, plus LinBPQ's node link to TheNet coming up. `--without-nov22` repeats the run without the `ROUTES` entry above, to show the failure. Evidence is in `evidence/linbpq-*`.
 
 ## Limits
 

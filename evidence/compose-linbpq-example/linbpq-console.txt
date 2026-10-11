@@ -1,0 +1,40 @@
+user:
+[2026-10-11T22:25:39Z >>> sysop]
+password:
+[2026-10-11T22:25:39Z >>> changeme]
+
+Connected to G9BPQ's Telnet Server
+
+
+[2026-10-11T22:25:41Z >>> NODES]
+BPQNOD:G9BPQ} Nodes
+TNET:G9TNT-1        
+
+[2026-10-11T22:25:45Z >>> C TNET]
+BPQNOD:G9BPQ} Connected to TNET:G9TNT-1
+
+[2026-10-11T22:25:52Z >>> NODES]
+TNET:G9TNT-1} Nodes:
+BPQNOD:G9BPQ       
+
+[2026-10-11T22:26:00Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+user:
+[2026-10-11T22:26:07Z >>> sysop]
+password:
+[2026-10-11T22:26:07Z >>> changeme]
+
+Connected to G9BPQ's Telnet Server
+
+
+[2026-10-11T22:26:09Z >>> C 2 !G9TNT-1]
+BPQNOD:G9BPQ} Connected to G9TNT-1
+
+[2026-10-11T22:26:17Z >>> ROUTES]
+TNET:G9TNT-1} Routes:
+> 0 BPQNOD:G9BPQ 192 1
+
+[2026-10-11T22:26:23Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+*** Disconnected from Stream 1
+Disconnected from Node - Telnet Session kept
