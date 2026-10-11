@@ -1,0 +1,307 @@
+                 Deviation Meter For TheNet X-1J
+1. INTRODUCTION
+            
+     The deviation meter is actually a peak audio level meter. It 
+     is  the first of a series of applications built into  TheNet 
+     X-series  firmware that makes use of an Analogue to  Digital 
+     Converter  ( ADC ). The ADC can be (optionally) added  quite 
+     simply to a TNC2.
+
+     This paper describes the circuit, its configuration and  its 
+     operation.
+            
+2. CIRCUIT OVERVIEW
+
+     The basic structure of the circuit is shown below :
+
+     << **************************************************** >>
+     << diagrams are only in MS-word version of the document >> 
+     << **************************************************** >>
+     
+     The  audio  input is amplified and converted to  a  DC  peak 
+     representation. This voltage is read by the ADC, which has a 
+     range  of 0 .. 3 volts, and converted into an 8  bit  binary 
+     value in the range 0 .. 255.
+
+     The  software  is configured to read the ADC at the  end  of 
+     each  valid packet. A packet is considered valid if its  CRC 
+     is  correct. As soon as a valid CRC is detected, the ADC  is 
+     instructed  to  start  converting  on  the  deviation  meter 
+     channel, this conversion taking 30 microseconds. Just before 
+     the  formatted  frame is linked into the  chain  of  pending 
+     received  frames, the ADC is read and the value stored  with 
+     the frame.
+
+     The reading therefore corresponds to the peak audio level at 
+     the  end  of a packet. If there are no non  linear  elements 
+     between  the receiver's discriminator and the  meter  input, 
+     this   will  correspond  fairly  accurately  to   the   peak 
+     deviation.
+
+     Care  must  be taken over its interpretation.  It  does  not 
+     measure  independently the two tone levels - it  is  assumed 
+     that whatever local standards that relate to pre-emphasis  ( 
+     i.e. use it or not ) have been implemented. If used for 9600 
+     baud FSK operation, this is not a problem.
+
+     The  meter  will  give the wrong  answer  on  the  following 
+     conditions 
+
+            A badly distorted audio signal
+            Badly off frequency
+            Incorrect adherence to local pre-emphasis 
+                   standards if used for AFSK
+            A noisy signal
+            
+3. SOFTWARE
+
+
+     As explained in section 2, the deviation meter is  activated 
+     on  receipt  of  a  valid  packet.  The  software  interrupt 
+     routine,  upon detecting a valid CRC, whether the  deviation 
+     meter  is  installed or not, whether it is enabled  or  not, 
+     will instantly write the 'start channel conversion'  command 
+     to the ADC ( I/O address 0x20 ) as soon as the interrupt  is 
+     serviced.  It  will therefore also be signalled  when  other 
+     errors such as framing or invalid CRCs are detected.
+
+     If  the  CRC is correct, then about 50 to  100  microseconds 
+     later,  the  Z80  will  read the  ADC  and  will  store  the 
+     corresponding  value  with the packet. Again,  this  happens 
+     whether or not the function is enabled (it is quicker to  do 
+     it than to test whether to do it or not ! ).
+
+     The value received is transferred to the internal heard list 
+     format  without conversion. It is still therefore the 8  bit 
+     count ( 0 to 255 ).
+     
+     When  a  user displays the heard list, the  deviation  meter 
+     parameter  (  as  set with the METER command )  is  used  to 
+     control  the display. If it is zero, the  deviation  details 
+     are not displayed in the heard list. If it is non zero, then 
+     the  8 bit count value is multiplied by the METER  value  to 
+     give  a  deviation reading in hertz. This  is  displayed  as 
+     kilohertz in the heard list. If the METER setting is '1'  it 
+     will have a full scale range of 0.2 KHz ( not very useful ). 
+     If set to 10, it will have a full scale range of 2.5 KHz. If 
+     set to 255, it will display up to 64 KHz. A typical  setting 
+     will  therefore be in the range 15 to 30, depending  on  the 
+     analogue  setting. The objective is to set it such that  the 
+     maximum  possible audio level from the receiver,  given  its 
+     filters, corresponds to just under the 3 volt maximum  input 
+     to the ADC.
+
+     The deviation is displayed to a resolution of 100 Hz, but it 
+     should not be assumed to be this accurate.
+
+     Small fluctuations in the reading can be expected.
+
+     Finally,  to  guard  against  an  unnoticed  overrange,  the 
+     display in the heard list will precede the deviation reading 
+     by  a chevron ( '>' ) if the value read from the ADC is  254 
+     or 255.
+            
+4. Detailed Circuit Description.
+
+     All  of the signals necessary for this circuit are found  on 
+     the  Z80 CPU chip located on the TNC motherboard,  with  the 
+     exception of a -5V power supply, and the audio signal to  be 
+     measured.
+
+     We therefore decided to base the circuit around the Z80 CPU. 
+     We knew from experience that people are reluctant to  attack 
+     the  insides of their TNCs' with a hot soldering  iron,  and 
+     settled  on  the socket idea as the least intrusive  way  of 
+     gaining access to the required signals.
+
+     The  circuit  was designed with the radio ham  junk  box  in 
+     mind,  with the only "specialist part"  required  being  the 
+     ADC itself. 
+
+     The input is first amplified (x10) by U2A a quarter part  of 
+     the  LM324  quad op-amp. This circuit is  also  a  precision 
+     half-wave  rectifier, which is used to reduce the effect  of 
+     D1's voltage offset. A more linear response is obtained with 
+     this  configuration. The output is smoothed by C2, and  then 
+     R3   provides   a  user  adjustable  control  for   the   DC 
+     representation of the received audio level into the ADC.
+
+     The  second  part of the quad op-amp (U2B)  provides  a  low 
+     impedance voltage reference drive for the ADC. R6 should  be 
+     adjusted  such that the DC level on pin 8 (VREF) on the  ADC 
+     is equal to 3.0 V.
+
+     The  address decode for the ADC is performed by 2  parts  of 
+     the  74HC00 (U3). The ADC is mapped to the I/O address  0x20 
+     and is selected by the X-1J software when required.
+     
+     The   other  three  (customisable)  ADC  channels  will   be 
+     available  for  use  in later releases, for  such  items  as 
+     temperature sensors, pressure sensors, or whatever comes  to 
+     mind  that will be of interest to users etc. There are  also 
+     two  spare  op-amps  within the LM324  for  use  with  these 
+     'customisable   inputs'.   Any  input   signal   should   be 
+     conditioned to provide a 0V...3V full scale signal into  the 
+     ADC .
+
+4.1 Parts List
+            
+            
+     QTY       REF                 PART
+     
+     2              C1, C3         1 fF @ 10V
+     1              C4             0.1 fF (de coupling capacitor)
+     1              C2             22 fF @ 10V
+     1              R1             10K
+     2              R5,R7          1K
+     1              R4             1K8
+     2              R3,R6          10K Miniature Potentiometers
+     1              R2             100K
+     2              D1,D3          IN4148
+     1              D2             2V7 Zener (250mW)
+     1              U1             ADC0844 (National Semi.) *
+     1              U2             LM324
+     1              U3             74HC00
+     1              JP1            3 pin HEADER
+     1              40PIN          40PIN WIRE WRAP SOCKET
+     1              PCB
+     1              X-1J           SOFTWARE!
+
+     *  The  ADC0844 is a four channel ADC  available  from  most 
+     large  mail-order companies. At the time of the X1J  release 
+     (August '93), I have had some concern over the price of  the 
+     device.  When originally selected the device  was  available 
+     for  approx.  8 in the UK. In the last two  months  it  has 
+     risen to 18!  It may be cheaper direct from outlets  within 
+     the USA.
+
+5. Construction
+            
+     PCB's,  PCB  patterns,  and  component  locations  will   be 
+     available  from G0JVU / G8KBB starting in  September,  1993. 
+     The  PCB  will be single sided and approx. 3 inches by  2  + 
+     inches.
+
+     However  the  circuit  is  not  complex  and  for  the  more 
+     adventurous  a  small circuit can be built up  (without  the 
+     need for a 40 pin socket) and then wired to the solder  side 
+     of the TNC motherboard. In fact the original prototype built 
+     on veroboard measured 1 inch by 2+ inches. 
+
+     The  40 pin socket on the DEV PCB is intended to be  a  wire 
+     wrap  type,  soldered  to the DEV unit PCB  with  long  legs 
+     extending  down,  cropped so that the PCB can  be  "plugged" 
+     into  the  40  pin Z80 socket on the  TNC  motherboard.  The 
+     previously removed Z80 CPU is then re-inserted in the socket 
+     on the DEV PCB.
+
+     If your TNC's Z80 is not socketed, you may like to  consider 
+     adding  one  now! Otherwise you will need to work  out  some 
+     other way of getting the necessary signals to the DEV board. 
+     I  suggest fitting a  "tin-plate" folded pin socket, as  the 
+     wire wrap sockets will locate into them. Turned pin  sockets 
+     present extreme difficulty in mating with the square section 
+     wire wrap sockets.
+     
+     If   there  is not enough clearance in the TNC box  for  the 
+     extra PCB, you could consider using a header plug, with  the 
+     necessary  signals  being  transferred to the  DEV  board  , 
+     mounted elsewhere, via a short cable.
+     
+     There are three other connections that need to be made  from 
+     the DEV PCB to the TNC motherboard:
+     
+     JP1 Pin 1      Cable shield for audio signal (Earth)
+     JP1 Pin 2      Audio input from rig (5pin DIN inside TNC)
+     JP1 Pin 3      -5V (from TNC motherboard)
+     
+     
+     Solder  in the components in the usual way, taking care  not 
+     to make any solder bridges to the tracks running  in-between 
+     the IC pads. Ensure the chips, and polarised components  are 
+     the  right way around, and take the usual  ESD  precautions. 
+     There are four wire links needed on the PCB to complete  the 
+     single-sided circuit.
+     
+6. Alignment
+            
+     There are four adjustable controls that will need to be set-
+     up for correct operation.
+     
+     1) Radio's   audio  drive  signal  into  the  TNC.   (Volume 
+        control).
+     2) The deviation signal level control (R3).
+     3) The reference voltage for the ADC. (R6)
+     4) The METER parameter within X-1J.
+     
+     The best set-up sequence (todate)  is:-
+
+     a) Adjust R6 on the DEV board to give 3.0V input into pin  8 
+        of the ADC.
+     b) Attach  an  oscilloscope (if available) to pin 1  of  the 
+        LM324.  Turn  the  rig's squelch control  such  that  the 
+        squelch  noise is driving the input of the  DEV  circuit. 
+        Adjust the rig's audio drive signal into the DEV  circuit 
+        so  that  the output of the op-amp is just  clipping  the 
+        power  rails.  This will be seen as a 10V  peak  to  peak 
+        signal.  
+     c) Adjust R3 to give the maximum DC signal into pin 3 of the 
+        ADC. This should be 3V maximum.
+
+     Note: The function of R3 is to scale the input voltage  into 
+     the  ADC. The maximum signal available from the  circuit  is 
+     approx. 3V which corresponds to the full range of the ADC. A 
+     3V input into the ADC will enable the circuit to present the 
+     widest  possible  range  of values  to  the  X-1J  software.  
+     However significant "unexplained" variations in the reported 
+     deviation (MHEARD list) can be reduced by lowering the input 
+     voltage  to the ADC. If you do need to adjust this  voltage, 
+     then you will also have to adjust the METER parameter within 
+     the X-1J software again.
+     
+     d) The  "METER"  parameter  within  X-1J  gives  the   final 
+        adjustment to the circuit. Converting the received binary 
+        number into a meaningful deviation in KHz.
+        In practice with the unit operating as described above, a 
+        value of 47 was found to provide a true representation of 
+        the  displayed  deviation to the measured  deviation.  To 
+        ensure an accurate measurement is given to the user,  you 
+        will need to calibrate the function using a signal with a 
+        known deviation!
+     
+     As  you  can  see from the above set up  procedure.  If  you 
+     change the setting of the volume on the rig afterwards,  all 
+     will  be  lost!   It is preferable to take  the  audio  from 
+     before  the  audio  amplifier sections  of  the  receiver  ( 
+     ideally  direct from the discriminator ) and to  adjust  the 
+     parameters or op-amp gain accordingly.
+
+7. Contacts.
+
+     G8KBB can be contacted via...
+
+     G8KBB @ GB7MXM
+     +44 473 682266 ( GMT 19:00 - 2200)
+
+     Dave Roberts
+     7, Rowanhayes Close
+     Ipswich
+     IP2 9SX
+     ENGLAND
+
+     G0JVU can be contacted via....
+
+     G0JVU @ GB7MXM
+     G0JVU @ G0JVU.ampr.org
+     NEVILLE @ SWFMC1.SINET.SLB.COM
+     Compuserve: 100021,3307
+     +44 394 274795 (GMT 19:00 - 22:00)
+
+     Neville Pattinson
+     10, High Hall Close
+     Trimley St Martin
+     Felixstowe
+     Suffolk
+     IP10 0TJ
+
+

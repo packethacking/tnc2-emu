@@ -1,0 +1,2043 @@
+                      TheNet X-1J release 2
+        
+                      Overview of Operation
+        
+1. INTRODUCTION
+        
+     This  paper  introduces  the main features  of  TheNet  X-1J 
+     release  2.  This  is an update to  the  previous  paper  on 
+     version X-1J, and incorporates a number of changes including 
+     the following : 
+        
+        * Support for TexNet
+        * S Meter extensions to the heard list
+        * An ADC command to read DC voltage channels
+        * A bug fix to the size of the BBS, HOST and DXC buffers
+        * The command enable / disable syntax has been enhanced
+        * An  ACL  'speed-up' feature has been added  (  see  ACL 
+          details )
+        
+     The  software is a derivative of TheNet 1.01 by  NORD><LINK. 
+     Additional commands and bug fixes have been included in  the 
+     release.  In addition, the Patcher has been upgraded  and  a 
+     bug  fix  to  MOTOROLA.C attributable  to  KH6ILT  has  been 
+     included. My thanks to K4ABT, KA2DEW and WB4DDP to name  but 
+     a few for assisting with ideas, encouragement etc. Credit is 
+     also due to John Bednar, WB3ESS, for the SETHELP utility and 
+     Al,  WB0YRQ, for the MFJ1278C details. The  file  describing 
+     how  to set up a node stack so that all or a subset  of  the 
+     nodes share one IP address is attributable to Fiona, G7ANH.
+     
+     If  your  reaction is 'What I really want is  ......',  then 
+     please read on anyway, especially section 6.
+     
+     This  is  probably the last version of TheNet X-1.  This  is 
+     because  I  have agreed with Bill Beech, NJ7P, to  pool  our 
+     resources   for  future  developments.  The   next   version 
+     therefore will be a joint release of TheNet X-1J and  TheNet 
+     plus 2, provisionally called TheNet X-plus 3.0.
+     
+2. STRUCTURE
+        
+     One  of the problems to extending TheNet is the 32  K  EPROM 
+     limitation  imposed by the architecture of TNC2 clones.  The 
+     solution  to  this is to implement bank switching.  For  the 
+     BSX2  TNC and similar TNC2 clones, this can be  achieved  by 
+     the addition of a single wire as detailed in the bank switch 
+     modification  file. This is at the expense of the  HIGH  and 
+     LOW   commands.  The  other  version  that  was   previously 
+     available with HIGH and LOW in it is no longer supported  as 
+     it is incompatible with the deviation meter.
+        
+        
+3. NEW COMMANDS
+        
+     The following commands have been added to the release.
+        
+          BYE
+          BBS
+          HOST
+          STATS
+          MHEARD
+          MODE
+          MANAGER
+          AUDIT
+          TALK
+          CALIBRATE
+          LINKS
+          ACL
+          CLOSEDOWN 
+          BTEXT
+          DXCLUSTER
+          HELP
+          CTEXT
+          ALIAS
+          BBSALIAS
+          HOSTALIAS
+          DXCALIAS
+          QUIT
+          IPROUTE
+          ARP
+          IPSTATS
+          IPADDRESS
+          IPBROADCAST
+          UI
+          MTU
+          METER
+          ADC
+          ADC1
+          ADC2
+        
+     The following commands have been changed
+        
+          CQ
+          NODES
+          RESET
+          the <escape> commands
+          SYSOP
+        
+     The following features have been added to the code
+        
+          An Internet Router
+          Ability to respond to three additional aliases
+          A CWID keyer
+          The command processor has been extended
+          KISS mode operation on the RS232 port
+          HOST mode support on the RS232 port
+          Remote configuration of all parameters
+          Additional textual help messages
+          Support  for  a  4 channel ADC used  for  measuring  RX 
+          deviation, voltage and signal strength
+          Other changes as detailed herein.
+        
+     In addition, a number of small changes have been implemented 
+     to  satisfy the needs of specialist situations such  as  the 
+     ability to digi beacon packets.
+     
+     Network  management  in  this context  does  not  just  mean 
+     'setting parameters remotely'. It means the ability to  set, 
+     read  and interpret various monitors and  diagnostic  tools. 
+     Version  X-1C  included  the  first  part  of  the   network 
+     management,  the  MANAGER privilege and the  AUDIT  process. 
+     Version   X-1D   extends   the   auditing   and   statistics 
+     significantly including internal CPU monitors. Version  X-1E 
+     includes most of the additions that are planned, and version 
+     2  will  complete  the functions. No  other  release  before 
+     version  2  was planned, but the need to produce  a  version 
+     with  an IP router prompted X1J. Before moving to the  joint 
+     development,  I had agreed to finish off some long  standing 
+     commitments hence release 2 of X-1J. 
+        
+3.1 BYE or QUIT
+        
+     There  are  no parameters to these commands.  When  entered, 
+     they terminate the session. Both commands do the same thing.
+        
+3.2 BBS
+        
+     The syntax of the command is :
+        
+                       BBS [ * | ? | callsign ]
+        
+     With  no  parameter,  the  command  connects  to  a  station 
+     previously   specified  by  the  sysop.  Setting   the   BBS 
+     destination  is  done by the use of the BBS command  with  a 
+     callsign  as  a second parameter. Setting the BBS  to  allow 
+     this  may only be done by a sysop. The '*' option  may  also 
+     only  be  executed  by  the sysop,  this  command  clears  a 
+     previously specified BBS.
+
+     The '?' option ( or any text if not sysop ), prints out  the 
+     current BBS station setting.
+     
+     If no BBS is set, the command issues an error message if  it 
+     is invoked with no other parameters.
+     
+     The  idea  of  this command is that,  like  with  the  'BBS' 
+     command  of  the 'BPQ software, a user may  connect  to  the 
+     local BBS from the node.
+     
+     The  BBS,  HOST and DXCLUSTER commands work by  copying  the 
+     callsign into a buffer. The copy operation does not compress 
+     the  SSID into a single byte however, so a callsign such  as 
+     KA2DEW-15  would occupy 9 bytes. I had the buffers set to  8 
+     bytes  length  max in versions previous to X-1J  release  2. 
+     Sorry.
+     
+     
+3.3 HOST
+        
+     The syntax of the command is :
+        
+        
+                       HOST [ * | ? | callsign ]
+        
+     This command is very similar to the 'BBS' command. It allows 
+     connection  to  a  local  host, BBS  or  other  server.  The 
+     difference  however,  is that as long as the TNC is  not  in 
+     'crosslink' mode ( i.e. pin 23 on the RS232 port is high  ), 
+     and if a callsign is not set, the 'host' command connects to 
+     the local port.
+     
+     The  idea  of  this command is that,  like  with  the  'BBS' 
+     command  of  the 'BPQ software, a user may  connect  to  the 
+     local  BBS,  another  node or server  from  this  node.  For 
+     example,  if  a print server were connected to the  node  in 
+     'host'  mode,  this command would allow connection to  it  ( 
+     like  the  'connect' command with no other parameter  ).  In 
+     KISS   mode,  setting  a  callsign  or  node  alias   allows 
+     connection to another system.
+        
+3.4 STATS
+        
+     The  STATS command has no parameters. It prints a number  of 
+     internal TNC statistics. In this version, this is limited to 
+     the  level  1 stats of the radio channel  and  the  internal 
+     clocks,  the level 2 ( AX.25 ), 3 and 4 statistics, and  the 
+     CPU health checks.
+     
+     For level 1, six pairs of numbers are printed, corresponding 
+     to the percentage of time the transmitter was on followed by 
+     the percentage of time the receiver DCD was on, for each  of 
+     the  last six 10 minute periods. The data is presented  most 
+     recent period first. Two pairs of numbers are then displayed 
+     showing the transmitter underrun and receiver overrun. These 
+     are formatted as per the level 2 stats with port 0  followed 
+     by  port 1 for the current hour followed by the  totals  for 
+     the previous hour. In the case of the RS232 port,  underruns 
+     are  not  possible, and an additional error ( framing  )  is 
+     included.  The  RX  overrun includes  overruns  and  framing 
+     errors.
+     
+     For level 2, the following are displayed :
+        
+          Frame checksum errors
+          Total packets heard
+          Total packets received by the node ( ie sent to it )
+          Total packets sent by the node
+          Total receiver not ready packets sent
+          Total reject packets sent
+          Total receiver not ready packets received
+          Total reject packets received
+          Total number of link timeouts
+        
+     For each of the level 2 statistics, four numbers are  shown. 
+     The  first two are cumulative totals over the period of  one 
+     hour, incrementing in real time. The last two are the totals 
+     for the previous hour. Each pair of numbers is the total for 
+     the  radio  port  followed  by the total  for  the  RS232  ( 
+     crosslink ) port. 
+     
+     For  checksum  errors, port 0 shows CRC errors  and  port  1 
+     shows  ( when in 'crosslink' protocol mode only ),  checksum 
+     errors. As HDLC errors can be triggered by noise, acceptance 
+     of  CRC errors is conditioned by the state of the DCD  line. 
+     If DCD is on and an error is signalled, it will be added  to 
+     the  count.  This  reduces the false counts,  but  does  not 
+     eliminate them. Distant stations that keep the squelch  open 
+     ( just ) without being properly heard will result in lots of 
+     apparent errors.
+     
+     For level 3, the number of level 4 frames gatewayed  between 
+     nodes is displayed.
+     
+     For  level  4,  the  number of  transport  frames  sent  and 
+     received by the node are shown.
+     
+     For  level  3 and 4 statistics, two numbers are  shown.  The 
+     first  is the number of frames accumulating for  this  hour, 
+     and the second number is the total number of frames for  the 
+     previous hour.
+     
+     For  CPU health checking, two statistics are shown, the  CPU 
+     loading  and the buffer usage. Each looks like the  level  1 
+     stats with 6 numbers corresponding to the last six 10 minute 
+     periods. 
+     
+     The  CPU loading shows the number of times, divided by  100, 
+     that  the CPU makes it around its basic internal  scheduler. 
+     For a node just switched on, receiving nothing, this will be 
+     about  470  ish for a 4.9 MHz clock. With lots of  nodes,  a 
+     heard  list of 20 stations and 70-80% activity on the  radio 
+     channel for it to listen to, this can drop to about  350ish. 
+     If  it  drops  to  double figures,  worry,  as  the  CPU  is 
+     beginning  to  thrash.  At low double figures,  the  CPU  is 
+     pretty much working flat-out. Time to up its clock rate !.
+     
+     The  BUFFERS  statistic  shows the minimum  number  of  free 
+     buffers  that  the software had available to it  during  the 
+     last six 10 minute period. This indicates whether the TNC is 
+     failing   to   deliver  data  passed  to  it   for   onwards 
+     transmission, as well as how much data is backed up waiting. 
+     Additional stats needed to analyse this properly are not yet 
+     being collected.
+     
+     The  display  also  shows the elapsed time  since  the  last 
+     warmstart  followed  by  the running  time  since  the  last 
+     coldstart. Each number is the number of hours of operation.
+     
+3.5 MODE
+        
+     This  command is similar to the PARMS command, and  includes 
+     the new syntax described in section 3.32.
+     
+     It  allows a number of other features of the software to  be 
+     configured  remotely.  It removes the need for most  of  the 
+     host mode <escape> commands.
+     
+     The following parameters may be configured :
+        
+       1  The host mode
+       2  The CWID send period
+       3  The CWID keyer speed
+       4  The port nodes broadcast control
+       5  The crosslink / kiss control
+       6  The Tx delay
+       7  The full duplex flag
+       8  The RS232 port node broadcast interval
+       9  The node broadcast algorithm
+      10  The beacon period
+      11  The 'connect' redirector
+      12  The  'help  message enable' flags, case  sensitivity  & 
+          TALK 8 bit flag
+      13  The 'hash' node broadcast port control
+      14  Whether the node will listen for the extra aliases
+      15  Whether  remote disconnect causes reconnection  to  the 
+          switch
+      16  Control over 'slime trails'
+      17  Control over digipeating up/down links
+        
+     In operation, it behaves just like the PARMS command.
+     
+     The parameters are as follows :
+        
+3.5.1 Host mode control
+        
+     This parameter controls the 'host' mode. This is the mode of 
+     operation of the RS232 port when pin 23 is 'high'
+     
+     The valid values are 0 or 1.
+     
+     In  mode  0,  the port operates as  per  the  standard  node 
+     specification.  Mode  1 is designed to allow  connection  to 
+     hosts  or  modems or similar equipment that expects  a  'CD' 
+     type  of  signal  to signify that  an  incoming  /  outgoing 
+     connection is called for.
+     
+     In  mode  1,  the <escape> C and  <escape>  D  commands  are 
+     disabled and the other <escape> commands do not operate when 
+     connected. Instead, hardware handshakes are used to  control 
+     connections to and from the TNC.
+     
+     The TNC monitors pin 20 to determine the state of the  host, 
+     and  signals state changes to the host with pin 5.  When  an 
+     incoming  connect request is received ( by the  'c'  command 
+     with  no  parameters  or by the 'host' command  ),  the  TNC 
+     raises pin 5 to signal the connection and expects pin 20  to 
+     change state in response.
+     
+     When  the host wishes to connect to the TNC, it  signals  on 
+     pin  20 and the TNC responds with by changing the  state  of 
+     pin 5.
+     
+     It handles disconnects in a similar manner. Either the  node 
+     or the host may initiate disconnects.
+     
+     This  mode  is  experimental, changes may  be  made  to  its 
+     operation. It is designed for modems, print servers or hosts 
+     such as UNIX system TTY login drivers.
+     
+3.5.2 CWID control
+        
+     The next two parameters control the CWID keyer. 
+     
+     The  first parameter is the CWID repeat period  in  seconds. 
+     Valid values are 0 to 3600. 0 disables it but do not set  it 
+     below 120 apart from to disable it.
+     
+     The second parameter controls the keyer speed. Specifically, 
+     it sets the number of 10 millisecond periods per dot and per 
+     inter symbol delay.
+     
+     The  speed of sending is 120/n, so setting n to 6  gives  20 
+     wpm. Valid values are 4 to 10, corresponding to speeds of 30 
+     and 12 wpm respectively.
+     
+3.5.3 Node broadcast control
+        
+     This  parameter  allows control to be exercised  over  which 
+     ports nodes broadcasts are sent. Valid settings are 0 - 3.
+     
+     Value  0 disables node broadcasts. Value 3 ( the  default  ) 
+     works as normal. A value of 1 enables broadcasts on the HDLC 
+     port  only  whilst a value of 2 enables  broadcasts  on  the 
+     crosslink port only.
+        
+3.5.4 Crosslink / kiss
+        
+     This  parameter is used to set the  communications  protocol 
+     used on the crosslink port when pin 23 is tied low.
+     
+     The valid values are 0, 1, 2 or 3 
+     
+     Mode 0 - standard crosslink protocol enabled
+     Mode 1,2,3 - use KISS instead of crosslink.
+     
+     In  mode 1, KISS simply replaces the crosslink  protocol  In 
+     mode  2, packets received from the radio part that  are  not 
+     intended  for the node are copied to the RS232 port in  KISS 
+     mode. Similarly packets received on the RS232 port that  are 
+     not intended for the node are sent to the radio port.
+     In  mode 3, all packets received on one port are  copied  to 
+     the other port as well as being analysed by the node.
+     
+     These modes are not simply KISS implementations that replace 
+     the node, they run with the node.
+     
+     Mode 2 is designed to allow a KISS application and a node to 
+     share  a  radio without interference with  each  other.  The 
+     point  is  that  the PC TCP/IP system can  be  switched  off 
+     whilst leaving the node running to allow others to use it.
+     
+     Mode 3 is a debugging mode. One problem when faultfinding on 
+     a  node  is that it is impossible to see what  the  node  is 
+     seeing on the channel without replacing the ROM. By  setting 
+     this  mode, it is possible to connect a KISS application  to 
+     the RS232 port and observe what the node is seeing.
+     
+     Mode 3 is also designed to allow a PC running AXSTATS to  be 
+     connected to the RS232 port to allow logging and analysis of 
+     channel performance from the node itself. Note that  packets 
+     initiated  by the node for one port will not get  copied  to 
+     the other.
+        
+3.5.5 Tx keyup delay
+        
+     This   parameter  sets  the  TX  keyup  delay  in  10's   of 
+     milliseconds.  This  was  previously done  using  an  escape 
+     command.
+        
+3.5.6 Full Duplex
+        
+     This parameter sets or clears the full duplex control  flag. 
+     This was previously done using an escape command.
+        
+3.5.7 RS232 nodes broadcast interval
+        
+     When a crosslinked TNC is reset, it takes some time to learn 
+     about  the nodes that the other TNCs can hear.  Also,  nodes 
+     heard  by  one TNC can take an hour to be  notified  to  the 
+     others.
+     
+     In  order  to improve this, this parameter may  be  used  to 
+     change the frequency of nodes broadcasts on the RS232  port. 
+     When  set to 0, the node operates as normal. When set  to  a 
+     non  zero  value, it will broadcast the nodes on  the  RS232 
+     port  at that interval. Hence setting it to 600 would  cause 
+     nodes broadcasts at 10 minute periods. The nodes  broadcasts 
+     on  the radio port will continue to occur at the basic  rate 
+     set  by  the PARMS setting. The obsolescence count  will  be 
+     decremented at the basic rate, not at the faster RS232 rate.
+     
+3.5.8 Node broadcast algorithm
+        
+     This  value  controls the algorithm used.  Bits  within  the 
+     value set have significance as shown below.
+     There  is a problem with the nodes broadcast algorithm  when 
+     many TNCs are crosslinked on RS232. In order to address this 
+     a  variation  to  the algorithm  has  been  implemented  for 
+     experimental purposes. Feedback on its use is requested. Bit 
+     zero affects the HDLC port and bit 1 affects the RS232 port. 
+     When  a  bit is set to 1, the node  broadcast  algorithm  is 
+     modified so that it will not rebroadcast on the same port  a 
+     node  heard on that port when the best quality neighbour  is 
+     on  that port. It makes little sense to use it on  the  HDLC 
+     port but what the heck, it is implemented for  completeness. 
+     The  only  settings therefore that make sense are 0  and  2. 
+     These  correspond  to 'normal' and 'modified  on  the  RS232 
+     port' respectively. Setting it to 1 or 3 will result in some 
+     pretty weird effects.
+        
+3.5.9 Beacon period
+        
+     This  parameter  sets  the beacon interval  in  seconds.  In 
+     TheNet  1.01, this was fixed at 10 minutes ( 600 seconds  ). 
+     In  this  version, this parameter may be used to  change  it 
+     according the prevailing license conditions.
+        
+3.5.10 'Connect' redirector
+        
+     In TheNet 1.01, when 'connect' is given with no  destination 
+     callsign,  the node attempted to connect to the  local  host 
+     port.  In a crosslinked system, this vanished down  a  black 
+     hole. In previous versions of this code, the node  attempted 
+     to  connect  to the station set by the  HOST  command,  only 
+     trying  the  local host port if no destination  was  set  by 
+     HOST.  With  this  version, the node may  be  configured  to 
+     connect to the station set by the BBS, DXCLUSTER or the HOST 
+     command  depending  on this parameter.  When  zero,  connect 
+     attempts  will go to the HOST station, when set to  '1',  it 
+     will  attempt to connect to the BBS callsign. When set to  2 
+     it will attempt to connect to the DXCLUSTER callsign.
+        
+3.5.11 'help message enable' flags
+        
+     This  word controls the sending of help messages, with  each 
+     bit of the word controlling a separate function.  Currently, 
+     only 8 bits are effective, these being as follows :
+     
+          BIT  FUNCTION
+          =========================
+          0    Whether the 'please wait, trying xxxx' operates
+          1    Whether all commands appear in help for sysop
+          2    Whether the 'goodbye' message is given
+          3    Whether a welcome message is enabled ( CTEXT )
+          4    Whether nodes are shown as 'alias:callsign'
+          5    If  set, TALK data is passed as 8 bit data  rather 
+               than clearing the most significant bit
+          6    If  set,  node  aliases  are  deemed  to  be  case 
+               sensitive
+          7    If  set,  enables  the  TexNet  "***  LINKED   to" 
+               interface
+
+        
+     When  bit 0 is set, and the BBS, HOST or DXcluster  commands 
+     are given, then a message is sent from the node telling  the 
+     user  that  a connect attempt is being made. This  does  not 
+     affect  the 'connect' command itself, unless the command  is 
+     given  with no parameter as this is then equivalent  of  the 
+     BBS or HOST command.
+     
+     When  bit  1  is  set, and if a  sysop  gives  an  incorrect 
+     command,  the  help  screen  shows  all  commands  possible, 
+     including  those currently disabled ( as by definition  they 
+     are not disabled for the sysop ! ).
+     
+     When  bit 2 is set, then the use of the 'bye'  command  will 
+     solicit a 'goodbye' message from the node.
+     
+     Bit 3 switches on and off the 'CTEXT' message. When enabled, 
+     and  when  a  CTEXT message is set,  then  whenever  someone 
+     uplinks  to  the  node  alias, the  ctext  message  is  sent 
+     immediately on connect.
+     
+     Bit  4  switches the way in which nodes are shown  when  the 
+     ROUTES command is used. When set to '1', nodes are shown  as 
+     'alias:callsign'.  When  set to 0, they are  shown  only  as 
+     'callsign'.
+     
+     Bit  5  controls  only the passing of  data  in  TALK  mode. 
+     Normally, all data sent to the node has its most significant 
+     bit  cleared, to eliminate parity or similar problems.  This 
+     is  not  ideal  for those countries that  use  the  extended 
+     character set. When this bit is set, and only when in  TALK, 
+     data is passed as 8 bit data. Note that this does not  apply 
+     to  an  initial message sent on the same line  as  the  TALK 
+     command.
+     
+     Bit  6  makes node handing case  sensitive.  Normally,  node 
+     aliases are forced to upper case for searching in the  table 
+     and  for user 'connect requests'. If this bit is set,  these 
+     operations  will become case sensitive. This could  be  very 
+     confusing  for users unless they are aware of it and  expect 
+     it. It allows node aliases to be entered as lower case,  for 
+     example  in  setting the node alias and in  forcing  routes. 
+     Don't set this bit unless it is actually needed !.
+     
+     Bit 7 controls the TexNet interface. If set, the TexNet "*** 
+     LINKED  to"  command string handling is enabled  so  that  a 
+     TexNet  to  Net/Rom  interface  may  be  effected.  This  is 
+     described  further  in section 4.4. If the bit is  not  set, 
+     then  a TexNet "*** LINKED to" string will solicit an  error 
+     message.
+     
+3.5.12 'hash' node port control
+        
+     In  certain  networks ( notably the American ), there  is  a 
+     need  to  restrict the propagation of local nodes.  This  is 
+     done by using node aliases that start with a hash  character 
+     ( # ) and instructing specific nodes not to broadcast routes 
+     to nodes that start with this character. This parameter does 
+     this  by  enabling each port to be individually  enabled  or 
+     disabled  in  respect  to  'hash'  node  broadcasts.  Bit  0 
+     controls  the radio port and bit 1 controls the RS232  port. 
+     When  one  of these bits is set, hash nodes  will  never  be 
+     broadcast on that port.
+        
+3.5.13 Extra aliases
+        
+     If  this is set to '1', then the node will listen for (  and 
+     accept  uplinks to ) the aliases set in HOSTALIAS,  DXCALIAS 
+     and  BBSALIAS if they are set. If this parameter is  set  to 
+     '0',  or if the respective aliases are not set, it  will  do 
+     nothing. If you do not use the aliases, set it to 0 to avoid 
+     wasting processor time.
+        
+3.5.14 Reconnect to Switch
+        
+     If  this  parameter  is  set to  0,  the  node  operates  as 
+     normally. If set to a non zero value ( i.e. set to '1' ), it 
+     operates in 'reconnect' mode. When a station connects to the 
+     switch,  then  uses  the BBS,  HOST,  DXCluster  or  Connect 
+     commands to connect to another station, and then causes that 
+     remote   station   to  disconnect  them,   then   they   are 
+     automatically reconnected to the node with a 'welcome  back' 
+     message.
+        
+3.5.15 NoSlime
+        
+     This  parameter controls 'slime trails'. A 'slime trail'  is 
+     caused  when a remote node, whose identity is not  known  to 
+     the  node,  sends a transport connect request to  the  node. 
+     Subject to the settings of the port qualities, the node  may 
+     make  an entry in the node table in order to reply to  them. 
+     Such entries are typified by having no alias associated with 
+     them.
+     
+     Each  bit  in  the NoSlime parameter  controls  a  different 
+     function. Bit 0, if set, causes any stations without aliases 
+     to be 'hidden' when a nodes command is given. Bit 1. if set, 
+     causes the node to refuse to make slime trail entries in the 
+     node table. Before you use this feature, be careful to  make 
+     sure  that you understand the implications of doing  so,  as 
+     without fixed entries the node will refuse to accept level 4 
+     connections  from  a station until it has heard  their  node 
+     broadcast.
+     
+3.5.16 NoDigi
+        
+     This  parameter  controls the node's willingness  to  accept 
+     digipeated  level  2  connections  or  to  allow  digipeated 
+     downlinks from the node. Each bit of the parameter  controls 
+     a different function, as shown below :
+     
+          BIT  FUNCTION
+          =======================================
+          0    If set, do not allow digipeated connections to the 
+               node
+          1    If set, do not allow digipeated downlinks from the 
+               node switch
+        
+        
+3.6 MHEARD
+        
+     The  TNC can be instructed to keep a list of the  last  'nn' 
+     stations heard, where 'nn' is an integer between 1 and  100. 
+     It can also be disabled. The syntax of the command is :
+     
+     
+                       MHEARD [ nn ]
+        
+     The  parameter is optional and only operates for the  sysop. 
+     It  sets  the maximum length of the list.  Setting  to  zero 
+     disables the function.
+     
+     The  heard list uses free buffers for the list, so  a  large 
+     setting means less RAM for the node software.
+     
+     The  list  is  maintained  as linked  list,  with  the  most 
+     recently  heard station first. The display shows the  number 
+     of packets heard from that station and the time since it was 
+     last  heard, in hours minutes and seconds.  In addition,  it 
+     shows the port on which the station was heard together  with 
+     an indication as to whether the station is a node and / or a 
+     TCP/IP  or a TexNet station. It does this by  examining  the 
+     PID byte. 
+     Every  hour the list is checked for stations that  have  not 
+     been  heard for 12 hours, and any such stations are  removed 
+     from the list.
+     
+     To  disable the internal updating of the list ( and  thereby 
+     stop  the  CPU expending effort on the function ),  set  the 
+     size  to  zero  rather than just disabling  the  command  as 
+     described  in 3.8. Note though that the node will not  clear 
+     the list as updates have been disabled, so it will be up  to 
+     12  hours before the buffers used are freed.  To  accelerate 
+     this  process, set the size to 1, wait until it has heard  a 
+     station  ( any one will do ) then set it to zero. This  will 
+     free up all but one buffer immediately.
+     
+     The  heard  list  is  the  user  interface  to  the  receive 
+     deviation meter. Its operation is explained in section 3.31. 
+     If  enabled ( ie if the METER parameter is not set to  0  ), 
+     then  an  additional column will be displayed in  the  heard 
+     list that will show the received deviation in kilohertz ( as 
+     nn.n  ).  It  must be remembered that  this  is  derived  by 
+     measuring  the received signal audio level, and will not  be 
+     correct in the case of a badly distorted signal.
+     
+     The  heard list may also show received signal  strengths  if 
+     enabled by the Sysop. In this case, the signal strength will 
+     be  shown for each station in the list after  the  deviation 
+     level ( if enabled ). The display will be either dBm or  the 
+     common 'S1 to S9' format according to its configuration. How 
+     accurate  it is depends on the accuracy of its  calibration. 
+     At  best  it may typically be +- 1dB relative  accuracy,  at 
+     worst  totally misleading. In the same way that you can  use 
+     the deviation meter to set up your station, pay heed of  the 
+     signal  level  too. If you are 40 dB over the noise  into  a 
+     local  node,  consider  dropping your signal  20  dB  (  for 
+     example from 10 W to 100 mW ). Those around you also running 
+     high  power may however make this difficult. The idea is  to 
+     get in reliably with the snallest signal not to see how  big 
+     a signal you can put into the node.
+     
+3.7 CQ
+        
+     When CQ is disabled, the command now reports  apologetically 
+     rather than simply ignoring the request.
+     
+3.8 ALL COMMANDS
+        
+     There  is  often  a requirement to be able  to  disable  the 
+     connect  command whilst allowing level 3 relaying.  This  is 
+     achieved  by the use of a command qualifier, the  syntax  of 
+     which is :
+        
+        
+                       CONNECT [ + | - ]
+        
+     If  '-'  is entered by the sysop, then the  connect  command 
+     will  politely refuse to work. This can be reversed  by  the 
+     '+' command.
+     
+     This  has no effect of layer 3 relaying. Also, the  BBS  and 
+     HOST  commands  will still allow connections to be  made  if 
+     they are enabled and set.
+     
+     Further,  the syntax is valid for ALL commands, for  example 
+     the  CQ  command can also be disabled in the  same  way.  Be 
+     careful though. The command is only accepted from the sysop, 
+     so  if you disable the sysop and manager commands  you  will 
+     lock out remote management !.
+        
+3.9 NODES
+        
+     When  information on a node that is not known is  requested, 
+     the  program prints out an error message rather than  giving 
+     the names of all known nodes.
+     
+     When a node entry is made by the sysop, callsign checking is 
+     forced  ON  rather  than being determined  by  the  callsign 
+     checking parameter.
+     
+     Don't forget that node alias handling may be case  sensitive 
+     - see section 3.5.11.
+     
+     The entire contents of the node table routes may be obtained 
+     by the sysop or manager by the command
+     
+        
+                       NODES * *
+        
+     This  will dump info on all nodes, one node per  line,  with 
+     the following format:
+        
+        
+                  Alias:call   route1   route2   route3
+        
+     where  route1,  route2  and  route3  comprise  the  quality, 
+     obsolescence  count  and  port  followed  by  the  neighbour 
+     callsign  for each of the 3 route entries for that node.  If 
+     any  of  the routes are in use, a chevron will be  shown  by 
+     that route.
+     
+     The  extended  command  is only for sysop use  as  it,  like 
+     auditing and conferencing, causes the node to be a source of 
+     a  significant  amount of data ( dumping a large  number  of 
+     node  details can consume hundreds of buffers !!! ).  It  is 
+     quite possible that used indiscriminately, it could cause  a 
+     warmstart of the node. Be careful.
+        
+3.10 RESET
+        
+     The syntax of the command is now 
+        
+        
+                       RESET [ anything-else ]
+        
+     Entering the reset command alone will do a warmstart. If any 
+     other parameter is entered, a coldstart is performed.
+        
+3.11 MANAGER
+        
+     The MANAGER command gives the user extra privileges. In this 
+     version,  this  amounts  to the  ability  to  receive  audit 
+     messages from the node. The level of auditing is set by  the 
+     AUDIT command.
+     
+     The  privilege remains in force until cleared by  a  command 
+     that  affects  the  user  state.  Specifically,  these  are, 
+     entering  the  TALK  state,  executing  the  SYSOP  command, 
+     entering the MANAGER command and getting the password wrong, 
+     or  disconnecting from the node. Failing to get  the  second 
+     password  right when using the closedown command  will  also 
+     remove the manager privilege.
+     
+     If the MANAGER command is executed by a user who   connected 
+     to  the node by a level 4 circuit rather than by a  level  2 
+     circuit,  and  if the level 2 timeout is less  than  the  no 
+     activity  timeout, the connection will never timeout as  the 
+     clearing  and reconnecting of the level 2 circuit will  keep 
+     the process alive provided level 2 auditing is enabled. This 
+     allows  the operation of the node to be logged remotely  and 
+     continuously.  Alternatively,  if  the level  4  timeout  is 
+     greater  than 10 minutes, level 1 or CPU auditing will  keep 
+     it  alive if level 2 is switched off. NOTE : I have a  nasty 
+     feeling  that there is something not quite right here -  the 
+     link sometimes dies !.
+     
+     A user with MANAGER privilege also has SYSOP privilege.
+        
+3.12 AUDIT
+        
+     The syntax of the audit command is : 
+        
+        
+                       AUDIT [ new-value ]
+        
+     where  new value is an integer value. If no value is  given, 
+     or  the  user does not have SYSOP status, the  current  mask 
+     value  is displayed. Otherwise, the mask is updated and  the 
+     new value displayed.
+     
+     The  mask  controls the auditing of various  events  in  the 
+     node. Not all values are used yet, but those that are, are :
+     
+          BIT            USE
+          ============================================
+          0        Level 1 statistics on 10 minute updates
+          1        Level 2 connects & disconnects
+          2        reserved for future use
+          3        Level 4 connects & disconnects
+          4        Level 7 limited events ( use of sysop )
+          5        Full level 7 auditing
+          6        CPU auditing messages ( 10 minute updates )
+        
+     It  is suggested that the usual settings can simply be 0  or 
+     255.
+        
+     For level 1, messages are sent every 10 minutes showing  the 
+     percentage  of time that the receiver detected  carrier  and 
+     the percentage of time that the transmitter was on.
+     
+     At  level  2  &  4, the messages are  of  all  connects  and 
+     disconnects, shown in 4 different ways :
+        
+                  C    Connect message received by node
+                  CA   Connect message sent / Acknowledge received
+                  D    Disconnect message received by node
+                  DA   Disconnect message sent / Acknowledge received
+     
+     In  each case, 2 callsigns are shown. At level 2  these  are 
+     the source and destination of the AX.25 link. At level 4, it 
+     is the remote node callsign and user callsign. Each  message 
+     is  preceded by an indication of the source of the  message, 
+     such as "L2" or "L4".
+     
+     At  level 7, with bit 4 set and bit 5 clear, the only  event 
+     currently  audited is the use of the Sysop  command,  either 
+     directly  or via the manager command. If bit 5 is set,  then 
+     all  commands given to the switch are audited,  preceded  by 
+     the callsign of the user who entered the command.
+     
+     Bit  6  controls  CPU health check auditing.  If  set,  then 
+     whenever  the internal CPU statistics are updated,  messages 
+     are  sent  showing the CPU processor loading total  and  the 
+     minimum buffers level ( see STATS for more information ). 
+     
+     The  audit mask value should be set to 0 when  not  actually 
+     being  used.  Do not leave it set to another value  as  this 
+     wastes  processor  time. Note also that full auditing  on  a 
+     busy  node  makes  things worse. Treat  it  as  a  debugging 
+     feature !.
+        
+3.13 TALK
+        
+     Talk  is  a  conferencing command. It  allows  a  number  of 
+     stations to hold a simultaneous conference ( a bit like  the 
+     CONFERENCE  command  of a DX cluster ). There  is  only  one 
+     conference, and stations may connect to it by connecting  to 
+     the  node and issuing the TALK command. It may be exited  by 
+     disconnecting or issuing the command '/EXIT' at the start of 
+     a  line.  ( /EXIT may be abbreviated to /EX, and it  is  not 
+     case sensitive ).
+     
+     Each line sent by a user is copied to all other users in the 
+     conference,  preceded by the callsign of the user. The  data 
+     will  be  sent as 7 bit data ( ie the most  significant  bit 
+     will  be cleared ) unless the appropriate bit is set in  the 
+     help flags ( see section 3.5.11 ).
+     
+     Whenever  a new station enters the conference, or a  station 
+     leaves  the conference using the '/EXIT' command, the  other 
+     conference users get a message informing them of the  event. 
+     These status messages are sent with the callsign of the node 
+     rather than the user.
+     
+     Finally,  when entering the TALK command, a message  may  be 
+     sent  to all those users who are connected to the  node  but 
+     not  otherwise doing anything. For example if  GxABC  enters 
+     the line
+        
+        
+           TALK Hello fred, can I have a chat, type 'TALK'
+        
+     Then  all other stations connected to the node,  present  in 
+     the USER list but idle, get the message
+     
+        
+           GxABC>> Hello fred, can I have a chat, type 'TALK'
+        
+     displayed on their terminal.
+     
+     Note that merely connecting to the node does not  constitute 
+     being  connected  to the switch. Stations connected  to  the 
+     switch appear in the USER list.
+     
+3.14 SYSOP
+        
+     The SYSOP command has been enhanced to increase the level of 
+     security offered. One problem of the old system is that  the 
+     password is easily visible unless the user repeats the SYSOP 
+     command  a number of times. Even then,  correlation  between 
+     passwords is easy, so the password needs frequent  changing. 
+     To reduce the change period, and make it harder to discover, 
+     the node will accept a string of characters and scan it  for 
+     the password. Hence a response of, say, 30 or 40  characters 
+     can  be  sent,  with a random number  of  random  characters 
+     preceding the actual data and a random number following  it. 
+     This does not eliminate such attacks, but if used carefully, 
+     it makes it quite a bit harder to attack.
+     
+3.15 LINKS
+        
+     This  command shows the current level 2 links to  the  node. 
+     Displayed one per line, the two callsigns are shown followed 
+     by the link state, port number and current retry count.
+        
+3.16 CALIBRATE
+        
+     This  command  allows  remote  calibration  checks  of   the 
+     transmitter deviation. Its syntax is
+     
+        
+                  CALIBRATE period [ toggle ]
+        
+     The  period ( 1 to 60 seconds ), is the time for  which  the 
+     transmitter  will  key  up for with  constant  tone.  It  is 
+     undefined  as  to  which tone will be sent.  If  the  second 
+     parameter  is given, the node will toggle between the  tones 
+     every  [toggle]  seconds. The toggle must be between  1  and 
+     [period] seconds. If a period is not given, the user is  not 
+     sysop  or manager, or if it is out of range, the command  is 
+     ignored.  If the tone generator is busy because it is  about 
+     to send a CWID sequence, a 'busy' message is returned.  Note 
+     -  quite  often it can appear that the node  has  locked  up 
+     having  failed  to transmit the full  calibrate  period.  In 
+     fact, this is usually the hardware PTT watchdog in the  TNC. 
+     The  node thinks it is still sending but the hardware  timer 
+     has removed the PTT signal.
+        
+3.17 DXCLUSTER
+        
+     The DXCLUSTER command operates just like the BBS command  in 
+     that  it may be used to effect a connection to  a  DXcluster 
+     (assuming there is one nearby). It should be disabled if  it 
+     is not intended to be used to access a cluster.
+     
+     The syntax of the command is :
+        
+        
+                       DXCLUSTER [ * | ? | callsign ]
+        
+     With  no  parameter,  the  command  connects  to  a  station 
+     previously  specified  by the use of the  DXCLUSTER  command 
+     with a callsign as a second parameter. Setting the DXCLUSTER 
+     to  allow this may only be done by a sysop. The  '*'  option 
+     may also only be executed by the sysop, this command  clears 
+     a previously specified DXCLUSTER.
+     
+     The '?' option ( or any text if not sysop ), prints out  the 
+     current DXCLUSTER station setting.
+     
+     If no DXCLUSTER is set, the command issues an error  message 
+     if it is invoked with no other parameters.
+     
+     The  idea  of  this command is that,  like  with  the  'bbs' 
+     command  of  the 'BPQ software, a user may  connect  to  the 
+     local DXCLUSTER from the node.
+        
+3.18 HELP
+        
+     The  HELP command gives a message from the ROM. In  general, 
+     it  is expected that the message will be designed to  assist 
+     new users in understanding the operation or configuration of 
+     the  node.  The  message may span many  lines,  and  may  be 
+     changed  when  the  ROM  is  programmed.  As  delivered,  it 
+     contains  a  brief help screen detailing the main (  user  ) 
+     changes to the code.
+     
+3.19 CTEXT
+        
+     The CTEXT command sets or displays a message sent to a  user 
+     who connects to the node by uplinking to the node's alias.
+     
+     The syntax of the command is :
+
+                  CTEXT [ * | message ]
+        
+     With no parameter, the current message is displayed. If  the 
+     user is also a sysop, and if text follows the command,  that 
+     text  is added to the current connect text. If  the  message 
+     starts  with  a '*', the connect text  message  is  deleted. 
+     Hence,  to  clear the message, type the command  'ctext  *'. 
+     This is a change in version X-1J from previous versions. For 
+     further information, see section 3.33
+     
+     A  message is only sent if there is a ctext message set  and 
+     if the relevant bit is set in the mode command parameter  as 
+     described in section 3.5.11.
+     
+3.20 BTEXT
+     
+     The  BTEXT  command sets or displays the  additional  beacon 
+     text sent along with the beacon packets.
+     
+     The syntax of the command is :
+        
+                  BTEXT [ * | message ]
+        
+     With no parameter, the current message is displayed. If  the 
+     user is also a sysop, and if text follows the command,  that 
+     text  is  added to the current beacon text. If  the  message 
+     starts  with  a  '*', the beacon text  message  is  deleted. 
+     Hence,  to  clear the message, type the command  'btext  *'. 
+     This is a change in version X-1J from previous versions. For 
+     further information, see section 3.33
+     
+     Normally, beacon packets are UI frames that contain the node 
+     callsign and alias. If a beacon message is set, the text  of 
+     the  message  follows the alias in the same  packet.  It  is 
+     strongly suggested that beacon packets be kept brief !!!.
+     
+3.21 ACL
+        
+     This is probably the most complex additional command in  the 
+     program.  It  should be used with care, and  only  when  you 
+     really understand its operation - mistakes can result in the 
+     need  to go out to a remote site ( probably when it is  cold 
+     and wet ) to reconfigure the node.
+     
+     The command allows selective control, based on callsign,  of 
+     a  list of different events. The ACL contains two  types  of 
+     entry,  a default value and zero or more callsigns, each  of 
+     which  are  associated  with  a  value.  When  one  of   the 
+     controlled  events  occurs  ( such as an  incoming  level  2 
+     connection or a nodes broadcast ), the ACL is scanned for an 
+     entry that matches the callsign of the sender. If a match is 
+     found  (  but see below ), the value  associated  with  that 
+     callsign is used to determine the action the node will take. 
+     If no match is found, the default value is used.
+     
+     An ACL function mask is provided. This enables specific  ACL 
+     functions  to be disabled to speed up the node. Each bit  of 
+     the  mask  enables ( if set ) or disables ( if clear  )  the 
+     corresponding  function. For example, if the mask is set  to 
+     2,  the  node will only check its ACL for outgoing  level  2 
+     connections.
+     
+     Each bit of the value or mask controls a different function, 
+     as shown below :
+        
+          BIT      OPERATION
+          =====================================================
+          0    bar incoming level 2 connection
+          1    bar outgoing level 2 connection ( downlink )
+          2    ignore nodes broadcasts from this station
+          3    bar gatewaying at level 3 to/from this station
+          4    bar incoming level 4 connections
+          5    bar outgoing level 4 connections
+          6    ignore SSID in matching an entry
+     
+     So  if for example an entry exists for a callsign G99XXX  of 
+     6, then the node will not allow outgoing level 2 connections 
+     to  the node ( downlinks ), and will ignore node  broadcasts 
+     from that station. Note that these commands only operate  on 
+     the  events  themselves  -  if  G99XXX  creates  a  level  2 
+     connection, the node will quite happily use it itself.
+     
+     The  'ignore ssid' bit is used to match a  callsign  without 
+     regard to its SSID. This makes life interesting when finding 
+     a  match,  so the list is scanned twice, once for  an  exact 
+     match, and then for a match ignoring SSID if an exact  match 
+     is  not found. There can only be one exact match,  but  when 
+     searching  for a match without using SSID, the  first  entry 
+     found will be used.
+     
+     The syntax of the command is as follows ( 4 versions )
+        
+        
+                  ACL * value
+                  ACL & value
+                  ACL callsign + value
+                  ACL callsign -
+        
+     If  you  are not sysop, or if ACL is given on its  own,  the 
+     current contents of the ACL are shown. The first form of the 
+     command changes the default value, the second form sets  the 
+     mask enable value, the third makes an entry in the list, and 
+     the  last form removes an entry from the list. It  complains 
+     about syntax errors.
+     
+     A  few  moments  thought  will show  that  the  sequence  of 
+     commands
+        
+                  connect to node
+                  execute sysop or manager command
+                  type the command ACL * 127
+                  type the command ACL & 127
+                  disconnect
+        
+     is  quite catastrophic. You will not be able to get back  in 
+     again apart from via the host port and noone will be able to 
+     connect  to  or from the node. If you intend  to  experiment 
+     with  the  command, you should start by  entering  your  own 
+     callsign  with  a value of zero to ensure that you  can  get 
+     back in again !!!.
+     
+     The  list  can be used as an 'accept' or  'reject'  list  by 
+     judicious use of the default. To create a list that excludes 
+     specific  calls,  put them into the list with  the  required 
+     bits set in the value. The default should be zero. To create 
+     an 'accept' list, put entries in with the required bits zero 
+     and  set the corresponding bits in the  default.  Individual 
+     bits  may be used to create accept or reject lists for  each 
+     function.
+     
+     The command steals buffers at a rate of one buffer per  four 
+     entries in the ACL. Also, a long ACL will slow the node down 
+     nicely - so think before you enter a long list.
+     
+     This command is for experimental purposes - if you find  any 
+     bugs,  let  me  know please ( I have not  fully  tested  the 
+     gateway  bit  for example ). Also, it is  not  intended  for 
+     malicious use but to allow fine control to be exercised over 
+     backbone networks. If I get lots of negative responses back, 
+     the command will go !
+     
+     The  mask value should be set so that only  those  functions 
+     actually  being used are enabled. For example, if  the  node 
+     has an ACL set to control level 2 uplinks and downlinks,  it 
+     will also check its ACL for all other controlled  operations 
+     such  as level 3 gatewaying. This will result in  much  time 
+     being  wasted searching the list for a result that is  going 
+     to always succeed. In the example cited therefore, the  mask 
+     would be set to 3. On reset, the mask value is set to  zero, 
+     SO  ALL ACL FUNCTIONS ARE DISABLED AND MASK MUST BE  SET  TO 
+     ENABLE THEM !.
+     
+3.22 CLOSEDOWN
+        
+     The  closedown  command  is  used  to  shut  down  the  node 
+     remotely.   If   successfully  executed,   the   node   will 
+     effectively  stop  operating until it is reset ( e.g.  by  a 
+     power up ). The node's configuration ( routes, messages etc. 
+     )  are  not  destroyed  -  the  node  simply  hits  a   HALT 
+     instruction. You must be sysop to execute the command.
+     
+     The syntax of the command is:
+        
+        
+                       CLOSEDOWN A
+        
+     The  node will respond with 5 numbers just as for  when  the 
+     sysop or manager command was executed. Yes, you guessed, the 
+     node  expects  another password. Give it correctly  and  the 
+     node closes down completely. Get it wrong and you lose  your 
+     sysop status. This obtuse and awkward syntax is designed  to 
+     make sure it is not accidentally executed.
+     
+3.23 ALIAS
+        
+     The ALIAS command allows the node's alias to be changed. The 
+     syntax is :
+        
+        
+                  ALIAS [ * | new-alias ]
+        
+     If  no  parameter is given, or if the user is not  SYSOP  or 
+     MANAGER,  the  current alias is displayed. If the  alias  is 
+     deemed  to be a valid alias, the node's alias is changed  to 
+     the new one entered. Note that the algorithm that checks for 
+     the  alias  structure  is a bit queer. It  is  however,  the 
+     original  algorithm of TheNet and I am loathe to  change  it 
+     for  fear  of  side effects. Note  too  that  the  companion 
+     CALLSIGN command is NOT included - chaos is not something  I 
+     crave.  If the sysop gives the parameter of '*', the  node's 
+     alias is cleared.
+        
+3.24 BBSALIAS HOSTALIAS DXCALIAS
+        
+     These commands are used to enable the node to respond to  up 
+     to three additional aliases. The syntax of each is the same, 
+     and by way of example the BBSALIAS syntax is :
+        
+        
+                  BBSALIAS [ * | new-alias ]
+        
+     If  not sysop, if no new alias is specified, or if  it  does 
+     not  pass the weird alias syntax checker ( see 3.23  )  then 
+     the  current  alias  is  displayed. If  not,  the  alias  is 
+     changed. If '*' is given, the alias is cleared.
+     
+     The  aliases  so entered are nothing to do with  the  node's 
+     identity. If a BBS alias is set, for example to MXMBBS, then 
+     the node will listen for level 2 connects to that alias.  It 
+     will  respond to them and will automatically invoke the  BBS 
+     command. The use will also get the optional welcome  (ctext) 
+     message and 'trying to connect to ....' messages if  enabled 
+     by the appropriate 'mode' parameter.
+     
+     The  idea is that where a node sits on a channel  that  does 
+     not  have  access  to the local host, BBS  or  cluster,  the 
+     normal aliases of those stations may be enabled in the  node 
+     to allow consistent access to the local services. Note  that 
+     the  three  stations  do  not have to be  a  BBS,  Host  and 
+     cluster, it could be three BBSes or any other combination.
+        
+3.25 IPSTATS
+        
+     The  IPstats command has the same basic syntax as the  PARMS 
+     and  MODE  commands.  When invoked  without  parameters,  it 
+     displays  the  current  stats. Each statistic  may  also  be 
+     altered by sysop, as defined in section 3.32.
+     
+     In  addition to the standard IP MIB, there is an  additional 
+     parameter  used  to set the level 2 default modes,  and  the 
+     first  entry  in the MIB is used to enable  or  disable  the 
+     router.
+     
+     The   complete  set  of  IP  MIB  stats  are  included   for 
+     compatibility  with  other IP systems, but several  are  not 
+     used.  Also,  the  stats  are 16 bit  counters  not  32  bit 
+     counters as in NOS. Like NOS however, the stats do not reset 
+     every  hour,  they must be cleared by the sysop.  They  will 
+     however wrap around at zero.
+     
+     The entries are:
+        
+             1    Port default modes
+             2    Enable / Disable the IP router functions
+             3    Default IP Time To Live
+             4    IP Received frames
+             5    IP Header Errors
+             6    IP Input Address Errors
+             7    IP Forwarded Datagrams
+             8    IP Unknown Protocols
+             9    IP input frames Discarded
+             10   IP Input frames Delivered
+             11   IP Output Requests
+             12   IP Output Discards 
+             13   IP Output No Routes errors
+             14   IP Reassembly Timeout errors
+             15   IP Reassembly Required errors
+             16   IP Reassembly OKs
+             17   IP Reassembly Fails
+             18   IP Fragmentations completed OK
+             19   IP Fragmentation Failures
+             20   IP Fragmentation Creates
+        
+     The  default mode word may be set to 0, 1, 2 or 3. Each  bit 
+     controls a port, with bit 0 controlling port 0 ( radio port) 
+     and bit 1 controlling port 1 ( RS232 port ). When set to  1, 
+     the  default  mode for that port when sending on a  level  2 
+     connection  will  be Datagram. When set to 0 it will  be  by 
+     Virtual  Circuit.  The default mode is used  when  no  other 
+     information is given, either by the ARP table or by the  TOS 
+     bits in the IP header.
+     
+     The enable / disable word may be set to 0 or 1. When set  to 
+     0, the operation of the router is stopped, when set to 1 the 
+     router functions.
+     
+     The  IP Time To Live ( TTL ) word is used to set the  number 
+     of  routers through which an IP frame may pass before it  is 
+     discarded.  It is similar to the node layer 3 TTL  word.  It 
+     may  be set to any value up to 255, but values below 2  make 
+     no sense and are therefore not permitted.
+        
+     The IP fragmentation reassembly timeout counter is not  used 
+     as  the node is just a router. It is left set to 30  seconds 
+     just to show which one it is !
+     
+     The  rest  are just statistics. The patient  user  can  have 
+     hours  of fun working out which ones are not used ( or  just 
+     think about it for a second or two ).
+        
+3.26 IPADDRESS & IPBROADCAST
+        
+     These  commands are used to set or display the IP  addresses 
+     used by the node. The syntax of each is (by way of example):
+        
+        
+                  IPADDRESS [ ipaddress ]
+        
+     where ipaddress is in the form 
+        
+        
+                  nnn.nnn.nnn.nnn 
+        
+     where nnn is an integer in the range 0..255
+     
+     So  to set the node IP broadcast address to that  used  over 
+     here, the command would be :
+        
+        
+                  IPBROADCAST 44.131.0.0
+        
+     The IPADDRESS is the address that the node will respond  to. 
+     It  is used only as detailed in section 7. The IP  broadcast 
+     address  is  the one used to denote broadcast  packets  that 
+     will  be largely ignored. Note that port addressing  is  NOT 
+     currently supported. Anyone who finds this limiting, drop me 
+     a line and I'll see if I can change it.
+        
+3.27 IPROUTE
+        
+     This is one of the two main databases used by the node.  The 
+     IP  Route table is used to tell the router where to  send  a 
+     frame  for  a  specific destination. It  maps  addresses  or 
+     address  ranges to a gateway IP address and  to  sub-network 
+     ports.  The  ARP database then tells the node  what  station 
+     corresponds to that address and protocol. The node  supports 
+     two subnet protocols, AX25 and Net/Rom.
+     
+     The  database  is stored in an ordered list,  in  decreasing 
+     order  of  the number of relevant bits. This  is  to  permit 
+     searching  of  the database when trying to find  a  specific 
+     destination.  Given  an  address, it  scans  addresses  with 
+     decreasing  numbers  of  bits until it finds  a  match.  The 
+     syntax of the command is as follows :
+     
+     
+             IPROUTE [address [ / bits ][ + port [gateway [metric]]]]
+        
+     or
+        
+        
+             IPROUTE [address [ / bits ][ - ]]
+        
+     In  the first form, it makes an entry in the table,  in  the 
+     second it deletes one. Only sysop or manager may effect such 
+     a change. The parameters are as follows :
+        
+             address  The    amprnet   address   in   the    form 
+                      nnn.nnn.nnn.nnn
+             bits     The   number   of  significant   bits   (eg 
+                      44.131.0.0 / 16)
+             port     The  port, either 0 or 1 for AX25 or n  for 
+                      Net/Rom
+             gateway  The   optional  gateway  for   this   dest. 
+                      nnn.nnn.nnn.nnn
+             metric   Currently not used, a numeric value
+        
+     When  an entry is made with a specific number of  bits,  the 
+     address  is  'masked  off' to that many bits,  so  enter  an 
+     address  of  44.131.16.31 / 24 and it will  get  entered  as 
+     44.131.16.0.  The valid range for the number of bits is 1  - 
+     32.
+        
+        
+3.28 ARP
+        
+     The  ARP  table  maps a pair  of  address+port  to  hardware 
+     address+subnetwork mode. The address is either a destination 
+     or  a gateway in the form nnn.nnn.nnn.nnn. The  protocol  is 
+     either  Net/Rom or AX25. The hardware_address is a  callsign 
+     and the subnetwork mode is DG or VC ( only has  significance 
+     for level 2 links ).
+     
+     The syntax of the command is :
+     
+     
+          ARP [ destination [ + [P] protocol callsign [ mode ]]]
+     
+     or
+        
+          ARP [ destination [ - protocol ] ]
+     
+     
+     In  the  first form an entry is made in the  table,  in  the 
+     second an entry is deleted. This is only permitted for sysop 
+     or manager.
+        
+     The parameters are :
+     
+          destination    An address of the form nnn.nnn.nnn.nnn
+          P              If   present,   marks   the   entry   as 
+                         'published'
+          protocol       AX25 or Net/Rom
+          callsign       A valid amateur callsign, e.g. G8KBB-5
+          mode           DG or VC
+     
+     If  'P' is entered, then the node will publish the  address. 
+     Specifically,  if an ARP request is seen by the node  for  a 
+     station  with  the address given, it will  send  a  response 
+     advising the caller of the callsign to be used.
+     
+     More details on the operation of the router are contained in 
+     section 7.
+        
+3.29 UI
+        
+     The  UI command allows a string to be sent as a Level  2  UI 
+     frame. The syntax is
+     
+        
+                  UI dest string_of_text_ending_in_return
+        
+     Dest  is  a callsign like destination such as  'MAIL'.  What 
+     will  happen is that a single UI frame will be sent  with  a 
+     source  callsign  of  the user who entered  the  command,  a 
+     destination callsign of dest, and the rest of the string  as 
+     text.
+     
+     It  is designed to be used in situations where a  local  BBS 
+     does not have access to a common channel and wishes to  send 
+     mail notification packets. Not surprisingly, the ability  to 
+     do this is BBS specific.
+        
+3.30 MTU command
+        
+     The  MTU  command is used to configure  the  node's  Maximum 
+     Transmission Unit figures ( primarily for TCP/IP support  ). 
+     In  general, they should be left at the default  values.  Do 
+     not  experiment  unless  you are  sure  you  understand  the 
+     significance of what you are doing !!!!
+     
+     The syntax of the command is identical to the syntax of  the 
+     PARMS and MODE commands, as defined in section 3.32.
+     
+     There are 5 values configured by the command. These are :
+        
+          No.  Default   Function
+          ========================================================== 
+          1      256    Sets  the  MTU for the IP  router,  AX.25 
+                        Level 2, Radio port ( port 0 )
+          2      256    Sets  the  MTU for the IP  router,  AX.25 
+                        Level 2, RS232 port ( port 1 )
+          3      236    Sets  the MTU for the IP  router  Net/Rom 
+                        interface
+          4      257    Sets  the  maximum number of  data  bytes 
+                        permitted  in  an  AX.25  level  2  frame 
+                        before  an error response is returned  to 
+                        the sender ( frame too long )
+          5      328    Sets   the   maximum  number   of   bytes 
+                        permitted  in  a level  2  packet.  Above 
+                        this,  frames are discarded. If a  packet 
+                        may contain 256 data bytes, and a maximum 
+                        length address of sender, recipient and 8 
+                        digis comprises 70 bytes, and 2 bytes are 
+                        used  for  control  bits,  the  total   ( 
+                        256+70+2   )  is  the  setting  of   this 
+                        parameter.
+     
+     This command replaces the ROM patching needed for TheNet  X-
+     1H.
+     
+     The minimum that an MTU may be set to is 64, the maximum  is 
+     1024, but large packets increase the probability of crashing 
+     the node. Beware !!!!!!.
+     
+     The  MTU for the Net/Rom port should not in general  be  set 
+     higher than 236 or it will not be compatible with Net/Rom.
+     
+     The limits on the other two correspond to those necessary to 
+     support frames in the range 256 - 1024 data bytes long.
+        
+3.31 METER command
+        
+     This  command's syntax is similar to the PARMS command,  and 
+     includes the new syntax as described in the overview  guide, 
+     section 3.32.
+     
+     It  allows the following parameters to be  controlled.  Note 
+     that the parameter list differs from TheNet X-1J, where  the 
+     first  (  and  onlyt ) parameter  was  the  deviation  meter 
+     scaling factor.
+     
+             1  The meter mode flags
+             2  The deviation meter scaling factor
+             3  The signal strength meter noise floor value
+             4  The S meter display format multiplier
+             5  The dBm meter display format multiplier
+             6  The dBm noise floor value
+             7  The voltmeter channel 1 multiplier 
+             8  The voltmeter channel 2 multiplier
+             9  The voltmeter channel 1 offset value
+             10 The voltmeter channel 2 offset value
+        
+3.31.1  The meter mode flags
+        
+     Each  bit of this parameter controls a different  aspect  of 
+     the meters as shown below
+     
+          BIT   If set, then ....
+          ======================================================
+           0    The deviation meter is enabled
+           1    The signal strength meter is enabled
+           2    The  signal strength is shown as S points  rather 
+                than dBm
+           3    ADC channel 3 is enabled ( voltmeter channel 1 )
+           4    ADC channel 4 is enabled ( voltmeter channel 2 )
+           5    Voltmeter  channel 1 divisor is 1000 rather  than 
+                100
+           6    Voltmeter  channel 2 divisor is 1000 rather  than 
+                100
+           7    Voltmeter  channel  1  displays  fine  resolution 
+                rather than integers
+           8    Voltmeter  channel  2  displays  fine  resolution 
+                rather than integers
+        
+3.31.2  The deviation meter scaling factor
+     
+     This  is the parameter previously described in section  3.31 
+     of  the  overview  guide.  It  scales  the  deviation  meter 
+     display.  One change however from X-1J. Setting it  to  zero 
+     does  not disable the deviation meter - bit 0 of  the  meter 
+     mode word as described above controls whether it is enabled.
+     
+     When  set  to  a value in the range 1 - 255,  the  meter  is 
+     enabled  and the value is used as a scaling factor. The  ADC 
+     is an 8 bit device, so it will give a response in the  range 
+     0 - 255, corresponding to an ADC input voltage in the  range 
+     0 - 3 volts DC. If optimally configured, this corresponds to 
+     the  maximum  audio level possible for  the  given  receiver 
+     discriminator.
+     
+     The  ADC  reading  ( 0 - 255 ) is multiplied  by  the  meter 
+     parameter value ( 1 - 255 ) to give an answer in the range 0 
+     to  65 KHz ( approx. ). This is the value displayed  in  the 
+     mheard list.
+     
+     Hence, if, for example, a DC voltage of 2 volts at the input 
+     to the ADC corresponds to 3.4 KHz deviation, the ADC reading 
+     will  be 171 ( +- a few ) and the Meter parameter will  need 
+     setting to 20 ( ie to 3400 / 171 ).
+     
+     If  the  ADC  reading is 254 or higher,  then  in  order  to 
+     indicate  an  overrange,  the symbol '>'  will  precede  the 
+     corresponding deviation entry in the heard list.
+     
+     
+3.31.3  The signal strength meter noise floor value
+        
+     This parameter sets the 'no signal' offset applied to  input 
+     readings  from the signal strength meter. It  is  subtracted 
+     from the count read from the ADC to give a reading based  on 
+     a  no  signal  value of zero. If the no  signal  (  noise  ) 
+     reading is, for example 0.65V, corresponding to an ADC count 
+     of 256 * 0.65 / 3 or 54, then 54 is subtracted from each ADC 
+     signal strength reading to give an integer from 0 to 201 for 
+     an input reading between 54 and 255.
+     
+3.31.4  The S meter display format multiplier
+        
+     This  parameter  operates  in a similar manner  to  the  dBm 
+     multiplier  (  section  3.31.5  )  but  having  divided  the 
+     intermediate  result by 256, that value is displayed  as  an 
+     integer  in the range 0 to 9 preceded by the letter 'S'.  If 
+     the  value exceeds 9, it is displayed as 'S9+'. If  the  dBm 
+     multiplier  has  been  set  up  correctly,  then  set   this 
+     parameter to the dBm multiplier divided by the number of  dB 
+     per S point.
+     
+3.31.5  The dBm meter display format multiplier
+        
+     This  parameter  is used to convert an ADC reading  for  the 
+     signal  strength meter into a dB count. The ADC  reading  is 
+     converted  into  a  count  from 0 to  n,  according  to  the 
+     description   contained  in  section  3.31.3.  It  is   then 
+     multiplied by this parameter and divided by 256. When  added 
+     to the dBm noise floor value ( section 3.31.6 ), this  gives 
+     the displayed dBm value in the heard list.
+        
+3.31.6  The dBm noise floor value
+        
+     This is the noise floor ( dBm ) reading that corresponds  to 
+     the  zero  count  in  section 3.31.3. It  is  entered  as  a 
+     positive  count  corresponding  to  a  negative  value.  For 
+     example, if the zero point in the example of section  3.31.3 
+     is -113 dBm, the noise floor value entered is 113.
+        
+3.31.7 The voltmeter channel 1 multiplier
+        
+     This  is the multiplier that controls voltmeter channel 1  ( 
+     ADC  channel  3 ). It is set as described  in  section  3.34 
+     below.
+        
+3.31.8  The voltmeter channel 2 multiplier
+        
+     This  is the multiplier that controls voltmeter channel 2  ( 
+     ADC  channel  4 ). It is set as described  in  section  3.34 
+     below.
+        
+3.31.9    The voltmeter channel 1 offset value
+        
+     This is the value subtracted from the ADC reading before  it 
+     is  multiplied by the multiplier parameter. It is  described 
+     more fully in section 3.34 below.
+        
+3.31.10   The voltmeter channel 2 offset value
+        
+     This is the value subtracted from the ADC reading before  it 
+     is  multiplied by the multiplier parameter. It is  described 
+     more fully in section 3.34 below.
+        
+3.32 PARM, MODE, MTU, METER & IPSTATS command syntax
+        
+     The syntax of these commands has changed.
+     
+     All  use the same syntax, which may be either of two  types, 
+     the  original  TheNet  1.01 syntax (  as  used  in  versions 
+     previous to X-1J ) or an 'offset & value' type.
+     
+     The original syntax was, by way of example, 
+     
+     
+          PARM { [ * | new_value ] [ * | new_value ] .......... }
+        
+        
+     so to set the 10th PARM ( the L4 retries ) to 1, the  syntax 
+     would be :
+     
+     
+          PARM * * * * * * * * * 1
+        
+        
+     The equivalent new syntax command would be :
+        
+        
+          PARM / 10 1
+        
+     
+     The '/' command signifies that what follows is the parameter 
+     number  followed  by the new value. As for the  old  command 
+     syntax,  the  complete  list  of  parameters  is  displayed. 
+     Setting  the  parameters may only be done by a  Sysop.  Note 
+     that  BOTH  command  syntaxes are supported -  you  can  use 
+     whichever you prefer.
+     
+3.33 BTEXT, INFO and CTEXT Command Syntax
+        
+     In  Version X-1J, the syntax of these commands  changed.  In 
+     addition, the Info message was doubled in size to 160 bytes.
+     
+     If  someone who is not Sysop uses the command,  the  current 
+     settings are displayed.
+     If  a Sysop uses it without any additional  parameters,  the 
+     current setting is displayed.
+     If  a  Sysop  enters  one of  the  commands  followed  by  a 
+     parameter of '*', the current message is deleted.
+     If  a Sysop enters a string of text, that text is  added  to 
+     the current message, followed by a newline.
+     
+     It is therefore possible to build up multiple line messages. 
+     If  you wish to start a message with a blank line,  enter  a 
+     message  with  a  non  display  (  or  innocuous  display  ) 
+     character such as control-A. It will get entered followed by 
+     a  newline. On most systems this will not display.  On  some 
+     systems such as PCs running NOS, it will display as a smiley 
+     face.
+     
+3.34 The ADC command
+        
+     This  command  is  used  to read the  voltages  on  the  ADC 
+     channels 3 and 4 ( referred to as the 'voltmeter channels  1 
+     and 2' in the documentation. 
+
+     A typical display is shown below :
+        
+                       IPNET:G8KBB-5}
+                       13.2 V DC
+                       -5 deg C
+        
+     Each  channel  is associated with a scaling  factor  in  the 
+     METER  command, an offset value, two control flags and  each 
+     meter may be enabled or disabled by setting or clearing  the 
+     appropriate  bit  in  the meter control  flags  word  (  see 
+     section 3.31 ). Finally, each has a textual string that  may 
+     be appended to the reading, as shown in the above examples.
+     
+     The displayed voltage is shown as 
+     
+          ( meter_reading - offset_value ) * Scaling_factor / n
+        
+     where  n  is  100 or 1000 depending on the  setting  of  the 
+     resolution  bit ( see section 3.31.1 ). The  calculation  is 
+     done  with 16 bit signed registers, so it is important  that 
+     the intermediate result of 
+     
+          (meter_reading - offset_value ) * Scaling_factor
+     
+     lies in the range -32768 to + 32767, hence the choice of n.
+     
+     It  is shown with a resolution of either 1 or 0.1  depending 
+     on the resolution flag, as described in section 3.31.1. 
+     
+     By way of example, with a scaling factor of 71, a resolution 
+     of 'fine', an offset of 0 and a divisor of 1000 will give  a 
+     display  ranging from 0 to 18.1V in steps of 100 mV  for  an 
+     input  in the range 0 to 3V DC input to the ADC. By  setting 
+     the  scaling factor and divisor accordingly, it is  possible 
+     to  create a meter with full scale readings up to 320V.  For 
+     the 18 V fsd meter, a resistor from ground to the ADC  input 
+     of 2.2K with a resistor from the ADC input to the voltage to 
+     be  measured  of 11K will give the correct  display  with  a 
+     scaling  factor  of 71 and an ADC reference of 3V (  with  a 
+     slight  error  that  can be corrected by  tweaking  the  ADC 
+     reference ).
+     
+     The  facility may be used to create a temperature  meter  by 
+     connecting  a  suitable sensor to the ADC input.  This  will 
+     usually give a value that ranges over a portion of the input 
+     range for a range of temperatures. The reason for the offset 
+     value  and  use of signed arithmetic is to allow  the  input 
+     reading   to   be  converted  into  a  direct   display   of 
+     temperature.   Full  details  are  contained  in  the   file 
+     'temp.doc', but by way of example, if the input probe  gives 
+     a  range of 0 to 2.6 V for a temperature display of  -40  to 
+     +90 degrees Celcius, the settings would be
+        
+                       offset = 68
+                       scaling factor = 59
+                       divisor = 100 ( control bit cleared ) 
+                       resolution = coarse ( control bit cleared )
+        
+     and  for a corresponding Farenheit display of -40  to  +194, 
+     the settings would be
+        
+                       offset = 38
+                       scaling factor = 106
+                       divisor = 100 ( control bit cleared ) 
+                       resolution = coarse ( control bit cleared )
+        
+     Note  that there is little point using the  fine  resolution 
+     mode for these displays.
+     
+     The  ADC  channels  are read whenever  the  ADC  command  is 
+     issued,  interrupts being disabled for 100 microseconds  for 
+     each   reading  on  a  4.9  MHz  TNC2.  The  ADC  needs   40 
+     microseconds  to convert the data, and the 100  microseconds 
+     allows for a 10 MHz TNC2 to be used.
+        
+3.35 ADC1 and ADC2 commands
+        
+     These commands are used to set a textual string that follows 
+     the ADC readings. The format and parsing is the same as  for 
+     the INFO and similar commands ( see section 3.31 ), but  the 
+     length is only 8 characters. The same routines were used  to 
+     save space but this is not really an ideal way to do it.  To 
+     set  a  string, the previous must be cleared  with  the  '*' 
+     option, and a new string entered. If the string is less than 
+     7  characters long it will be followed by a  newline.  These 
+     strings  are  not preset in the EPROM and will  need  to  be 
+     entered  after a coldstart. All other meter  parameters  may 
+     have ROM defaults.
+        
+4. Other Changes
+        
+     This  section covers the other miscellaneous changes to  the 
+     software.
+        
+4.1 Command Processor
+        
+     The command processor has been altered. In general, but  not 
+     in  all cases, commands only appear on the 'help' menu  when 
+     they are enabled, so for example the 'BBS' command will  not 
+     be  shown  unless  it  has been enabled  with  the  'BBS  +' 
+     command.  The  exception is the sysop commands,  like  MODE, 
+     LINKS  and PARMS, which are never shown to users but are  of 
+     interest  to them. If the appropriate bit is set however  in 
+     the  MODE  command  ( see 3.5.11 ), then for  the  sysop  or 
+     manager,  all commands appear in the help prompt -  EVEN  IF 
+     DISABLED.
+     
+     The help screen now shows commands in a combination of upper 
+     and lower case characters.
+     
+     Some  commands  however are never displayed in  the  command 
+     lists,  even when enabled. An example of this is  the  PARMS 
+     command.  This is controlled by a flag associated with  each 
+     command  in the same way that the command enable  /  disable 
+     bit is associated with each command.
+     
+     An  addition to the command syntax controls this. A  command 
+     is  displayed  to  a user only when it is  enabled  and  its 
+     display bit is set. The display bit is set by using the  '+' 
+     command with the letter 'D' following the '+'. Conversely it 
+     is cleared by using the '-' option followed by 'D'. Hence to 
+     display  the  PARMS command in the user  command  list,  the 
+     sysop enters
+     
+                       parms + d
+        
+     or to hide the STATS command whilst still leaving it open to 
+     users to use, the sysop enters
+     
+                       stats - D
+        
+     The 'D' may be in upper or lower case. 
+     The full syntax of the command modifier is therefore
+        
+                       command [ - | +  [ D ] ]
+        
+     If  no letter follows the '+' or '-', or if it is  not  'D', 
+     then  the  command enable / disable flag  is  modified.  The 
+     letter 'D' may be in upper or lower case.
+        
+        
+4.2 Beacon digi
+        
+     It is possible to set a digi in the address used for  beacon 
+     packets.  Details  of how to do this are  contained  in  the 
+     configuration  guide. Note that this is provided  for  those 
+     rare occasions when there is a genuine need. This is  rarely 
+     the case and should not be done unless really necessary.
+        
+4.3 Nodes Broadcasts after power-up
+        
+     The node will now broadcast its node table 60 seconds  after 
+     power-up.  This is to ensure that the network is back to  an 
+     operational  state  as  soon as possible  following  a  node 
+     reset.  The reason for the short delay is to cater  for  the 
+     situation  where the Sysop switches on the node  before  the 
+     radio.
+        
+4.4 TexNet interface handling
+        
+     The TexNet interface is controlled by bit 7 of the user help 
+     messages  word  ( MODE parameter number 12 ). If  set  to  a 
+     value between 128 and 255, the TexNet interface is  enabled. 
+     With values between 0 and 127 it is disabled.
+     
+     When disabled, operation is as normal.
+     
+     When enabled, the node will react to the TexNet "***  LINKED 
+     to.."  messages.  When a level 2 connection to the  node  is 
+     made, the node will examine the first line of text  received 
+     by  the  node.  It must be a line of text  terminated  by  a 
+     return  character,  and it must be the first  line  of  text 
+     received. If any other line is received first, the node will 
+     issue an error message.
+     
+     The line is checked to see if it starts with the text
+        
+                       *** LINKED to
+        
+     It  must start in the first character of the line and  match 
+     exactly the string shown. If it does, the text that  follows 
+     the string is scanned for a valid callsign. If one is found, 
+     the user call is remapped so that any subsequent actions  of 
+     that user are attributed to that new callsign. Any text that 
+     follows  the  callsign  ( including any  TexNet  SSID  )  is 
+     ignored.
+     
+     So, for example, if the string
+        
+                       *** LINKED to WB4DDP  E something else
+        
+     is received by a node ANODE:G8KBB from a station G9BF,  then 
+     the session, otherwise attributable to G9BF will be remapped 
+     to WB4DDP. The 'E' that followed was an SSID of 14, which is 
+     ignored.
+     
+     The heard list will show the following
+        
+                       ANODE:G8KBB} TheNet X-1J2 (644)
+                       TexNet(G9BF WB4DDP)
+        
+     Any  actions by that user, such as conferencing  or  onwards 
+     connection to other nodes will use the callsign WB4DDP. If a 
+     remote  disconnect  causes  reconnection to  the  node,  the 
+     remapped callsign will continue to be used.
+     
+     Note  that only one station at a time may use  a  connection 
+     between  a TexNet node and a TheNet node as it references  a 
+     remapped  level  2  connection. It is  however  possible  to 
+     connect to the callsign or alias of the node and invoke  the 
+     remapping function.
+     
+     When  the  TexNet remapping is done, then the  connect  text 
+     message  will be sent to the user if the connect message  is 
+     set  and  enabled. If the node sees a packet with  a  TexNet 
+     PID, it will note that station as TexNet in the heard list.
+        
+        
+5. CWID keyer.
+        
+     The  CWID  keyer  sends  the  station  callsign  in  CW   by 
+     alternating  between the two modem tones. This is  nominally 
+     sent  at  20 wpm once every 30 minutes, but  the  speed  and 
+     period can be changed remotely. 
+     
+     After  a delay of 30 minutes, the callsign is sent  appended 
+     to  the  end of the next data packet that is sent  over  the 
+     air.  There  is  a 500 ms delay after the end  of  the  data 
+     packet before the call is sent.
+     
+     The program prefers to send CWIDs appended to ordinary  data 
+     packets. However, if one minute after the CWID has  supposed 
+     to be sent it is still pending because no data packets  have 
+     been  sent, it will key up the transmitter anyway.  Persist, 
+     TxDelay  and other parameters are honoured, but the  process 
+     involves  changing  the  SIO  mode and  this  will  have  an 
+     annoying effect on any packets being received in full duplex 
+     mode.
+     
+     
+6. Version X-2.
+        
+     X-1 was the first release of this code. The objective is  to 
+     get  some  practical feedback and test the code  before  the 
+     full release, version X-2, which I hope will be very similar 
+     to  this release ( X-1J ). I have been saying this for  some 
+     time  now, but things keep getting added. This  is  probably 
+     the last in the TheNet X-1 series. The next version will  be 
+     a joint release with Bill Beech, NJ7P with Jack, N7OO, doing 
+     documentation.
+     
+     Version  X-1A added the escape-N command and the  change  to 
+     the connect, nodes and reset commands. The timers were  also 
+     added to the stats command.
+     
+     Version X-1B removed all the escape commands apart from C, D 
+     and P. It also added the MODE command and extended the + and 
+     - command qualifiers to all commands.
+     
+     Version  X-1C  added  TALK, MANAGER  and  AUDIT.  The  SYSOP 
+     command  was  enhanced and the INFO command was  altered  to 
+     limit  the  length  of a message ( a  bug  in  the  original 
+     version of TheNet ). The help screen was changed to  display 
+     commands in a combination of upper and lower case.
+     
+     Version  X-1D extended the auditing and statistics to  cover 
+     auditing everything but level 3, and statistics of the  CPU, 
+     Level 1, Level 2 and timers.
+     
+     Version  X-1E  added  beacon  timer  control,  the   connect 
+     redirector, the nodes dump facility, level 3 & 4  statistics 
+     and the LINKS and CALIBRATE commands.
+     
+     Version  X-1F  added the CLOSEDOWN, DXCLUSTER,  ACL,  CTEXT, 
+     HELP and BTEXT commands. Another parameter was added to  the 
+     MODE command to control textual messages. The mod  suggested 
+     by DF2AU to correct the DCD latchup was included. Additional 
+     statistics were added covering CRC errors, receiver overrun, 
+     transmitter underrun and framing errors.
+     
+     Version X-1G added mainly the IP router, with the  following 
+     commands  to control it - IPROUTE, ARP, IPSTATS,  IPADDRESS, 
+     IPBROADCAST. In addition, the ALIAS, BBSALIAS, HOSTALIAS and 
+     DXCALIAS commands crept in, as did QUIT as an alternative to 
+     BYE.  The  help  messages extended to enable  nodes  in  the 
+     routes  list to appear as alias:callsign, and an extra  byte 
+     on the MODE command allowed '#' nodes to be selectively  NOT 
+     broadcast.  The order of HELP and HOST commands  changed  so 
+     that  'h'  on  its  own gave help not  host.  The  code  was 
+     optimised  with  some time critical parts being  recoded  in 
+     assembler and a peephole optimiser being used for additional 
+     improvements.
+     
+     Version X-1H fixed 3 bugs in X-1G.
+     
+     Version  X-1J  added the deviation meter  support  with  the 
+     Meter  command and Mheard changes. In  addition,  parameters 
+     were  added  to the MODE command for  slime  trail  control, 
+     control of digipeating and reconnection to node. The command 
+     syntax  of  Info,  Btext and Ctext was  changed  to  support 
+     multiple lines and the Info message space was doubled to 160 
+     bytes. Nodes broadcasts now occur 60 seconds after power  up 
+     and  the ARP Digi bug fix was included. The level 4  minimum 
+     retries was dropped to 1 and the PARM, MODE, IPSTATS,  METER 
+     and  MTU  command syntax was extended to support  'offset  & 
+     value' type operation. An MTU command was added to allow  IP 
+     MTU  limits to be changed under software control.  The  node 
+     alias  case  sensitivity bit and TALK 8 bit data  bits  were 
+     added.
+     
+     Version  X-1J Release 2 fixed a couple of bugs, added the  S 
+     meter  function, voltage reading functions, TexNet  handling 
+     and extended the command enable / disable switches with  the 
+     'command - D'  syntax.
+     
+     If  you read this and say 'Pah. it doesn't do XXXXX' or  'It 
+     still  doesn't  do YYYYY' or anything of a  similar  nature, 
+     don't  keep  it to yourself. Tell me. I may well do  it.  An 
+     example of this are the many changes introduced into X1-J as 
+     a result of suggestions mainly by KA2DEW.
+        
+7. The IP router
+        
+     The IP router co-exists in the node with the other software. 
+     It is connected to the L2 and L3(Net/Rom) protocol machines, 
+     and is managed from the L7 switch. It will accept data  from 
+     L2  Datagrams, L2 Virtual Circuits or NOS protocol  extended 
+     Net/Rom  frames. It will output to these 3 depending on  the 
+     setting of the IProute and ARP tables.
+     
+     The  router supports the IP options of NOS and also does  IP 
+     fragmentation.  Level  2 segmentation is not  supported.  In 
+     addition,  ICMP is implemented in so far as it is needed  to 
+     respond  to  errors  or PINGs. No higher  layer  support  is 
+     provided,  i.e.  TCP  is  not  implemented,  ip_send()   and 
+     ip_receive()  are  only implemented in so far  as  they  are 
+     needed for ICMP. You can therefore PING it but anything else 
+     will solicit an ICMP error message.
+     
+     It  will  respond to ARP & REV_ARP requests but  will  never 
+     initiate them. The default MTU is 256 for AX.25 and 236  for 
+     Net/Rom.  It  will  accept longer datagrams  than  this  and 
+     fragment  the output but it is not recommended as it  merely 
+     wastes RAM. The MTU command may be used to change this.
+     
+     It is possible to be creative in the use of L2 datagram  and 
+     virtual circuits by use of the port default settings and the 
+     ARP table. The algorithm used is :
+     
+     When a frame is to be sent, the ARP table is scanned for the 
+     appropriate entry. The entry tells it what callsign to  use. 
+     For  Net/Rom  encapsulation,  it  is  sent  to  the  Net/Rom 
+     protocol  handler.  For AX.25  encapsulation  the  following 
+     applies. The ARP table may indicate DG or VC. In this  case, 
+     that  mode is taken. If there is no DG or VC entry, the  TOS 
+     bits are examined. If the delay bit is set, a datagram  mode 
+     is  selected.  If  not, and the reliability  bit  is  set  a 
+     virtual  circuit  is selected. If neither bit  is  set,  the 
+     default  mode for that port is used to select a mode  (  see 
+     IPstats command, first parameter ).
+     
+     Port addressing is not supported at the moment. When a  node 
+     stack  is being used, it is possible to set all nodes  or  a 
+     subset of them to the same IP address. For more information, 
+     see the file 'IPXLINK.DOC'.
+     
+     The  IP router is manually controlled - no rspf or  rip,  or 
+     even ARP requests. This is because 32K of RAM does not allow 
+     such  niceties as queuing frames whilst waiting for  address 
+     resolution.
+     
+8. MISC
+        
+     Anyone  interested  in  a copy of the  program,  drop  me  a 
+     message  on  GB7MXM.#36.GBR.EU  Also,  any  suggestions  for 
+     change gratefully received.
+        
+Dave G8KBB
+7, Rowanhayes Close
+Ipswich
+IP2 9SX
+England
+
+

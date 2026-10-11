@@ -1,0 +1,174 @@
+        Signal Strength Meter for TheNet X-1J Release 2
+
+
+This  file  contains  a description  of  the  S-meter  extensions 
+necessary for TheNet X- 1J to display received signal strength.
+
+The  software  assumes  that there is  a  signal  strength  meter 
+available  that produces a voltage proportional to the  logarithm 
+of  the  input  signal  strength. If  there  is  no  such  output 
+available  from the receiver, it is often possible to add such  a 
+function to it.
+
+If there is such a meter output, the ADC expects an input voltage 
+in  the range 0 to 3V. It is not necessary for the voltage to  be 
+referenced to zero for no signal, as the software can  compensate 
+for this. It must not exceed the ADC reference voltage ( 3V ).
+
+If  there  is no such meter output, then one may  be  created  by 
+adding  a  second  IF to the receiver. If a device  such  as  the 
+MC3356  or MC3362 is used, it has a logarithmic  Received  Signal 
+Strength  Indicator ( RSSI ) output of surprising  accuracy.  The 
+first  prototype I built had a deviation from linearity  of  less 
+than  1dB  over the main part of its range, with a  kink  at  low 
+signal  levels and compression at the high end. If you can  print 
+out  the  Word for Windows version of this file, a graph  of  the 
+calibration data is appended to the file. If not, the raw data is 
+contained  in  the file 'smeter.csv' in  comma  separated  spread 
+sheet  format.  The  next one built had 2  dB  variation  in  its 
+linearity over the operating range.
+
+The  prototype  circuit  is contained in  the  Word  for  Windows 
+version  of  this file. It consists of an FET input buffer  (  so 
+that  the receiver is not unduly loaded ) followed by a low  pass 
+filter.  The filter has a cut-off of 1 MHz. This is connected  to 
+the  IF  input of the receiver chip, and the output of  the  RSSI 
+taken from pin 14.
+
+The circuit is also shown in the file 'smeter.ljt'. This is an HP 
+PCL  printout file. Copy it ( a binary file with the '/B'  switch 
+if using DOS COPY ) to an HP Laserjet or compatible printer.
+
+You must consider the circuit as a design idea that will need  to 
+be  modified for your radio. My prototype was fitted to  the  455 
+KHz IF signal from the second conversion mixer, and the low  pass 
+was needed as there was a significant component of the 10.245 MHz 
+second  conversion oscillator in the signal. The IF strip of  the 
+MC3356  will operate from 200 KHz to 50 MHz, so without  the  low 
+pass it can be driven by a 10.7 or 21.4 MHz IF. What is important 
+is that the signal is taken after the main receiver  selectivity, 
+usually its crystal filter, and before any limiting IF  amplifier 
+stages. It is also important that the signal levels are  correct, 
+so  that  a signal that is just detectable on the  receiver  just 
+starts to increase the DC output of the RSSI. It may be necessary 
+to  adjust the signal level, for example by adding  an  amplifier 
+stage before the MC3356 input.
+
+Note  that there are many devices with RSSI outputs - use any  of 
+them  that are handy but remember you need one with  an  accurate 
+and  large range. The operational range of the MC3356 is  between 
+50  and 60 dB, and I am told that more modern cellular radio  IFs 
+have up to 90 dB range !.
+
+To  calibrate the meter, you need a known signal, for  example  a 
+signal generator of known output, and a switched attenuator  with 
+at  least  5dB  steps and preferably 2 dB  steps.  Connect  a  DC 
+voltmeter  to  the output of the MC3356, and connect  the  signal 
+generator to the receiver input operating frequency ( 144.625 for 
+the  prototype  )  via  the  attenuator.  The  signal  should  be 
+increased in 2 dB steps and the voltage noted for each step.  The 
+results  need  to  be  plotted as a  graph.  In  calibrating  the 
+prototype,  slight  errors were noted in the calibration  of  the 
+switched  attenuator.  These need to be subtracted out  from  the 
+data.
+
+On  the graph, draw a straight line through the curve as a  'best 
+fit' ignoring the end of range effects of noise floor, hysteresis 
+or overload. Where the line crosses the noise floor, note the  DC 
+voltage  and dBm level at this point. Calculate the slope of  the 
+curve in units of dB per volt. You should then have the following 
+data items :
+
+        * The noise floor DC reading
+        * The slope of the best fit calibration curve
+        * The dBm point that corresponds to the crossover of  the 
+          noise floor and the best fit calibration line.
+        
+The dB multiplier is calculated as :
+        
+             dB_multiplier = X . Vref / V
+        
+where  X dB change in input caused V volts DC change (  i.e.  the 
+slope of the best fit line from the graph ), and Vref is the  ADC 
+reference voltage.
+
+The data are input as follows :
+        
+The signal strength meter noise floor is entered as an integer in 
+the  range  0 to 255 ( hopefully a small number about  50  ish  ) 
+calculated  from the DC noise floor reading from the graph ( V  ) 
+and the ADC reference voltage ( Vref ) as
+
+             256 * V / Vref
+        
+The dBm meter display format multiplier is entered as  calculated 
+above from the graph. In my prototype, 54 dB change caused 2V  DC 
+change  in output with a 3V reference voltage, so the  multiplier 
+was 81.
+
+The   dBm   noise  floor  is  entered  at  a   positive   integer 
+corresponding  to the complement of the dBm zero point  from  the 
+graph. For example, 0.65 V DC was the noise floor reading for  my 
+prototype and the calibration line crossed this noise floor level 
+at  a dBm reading of -113 dBm. The dBm noise floor is entered  at 
+113 ( i.e. drop the '-' ).
+
+The  S  meter multiplier is set by trial and error  depending  on 
+your   perception   of   what  constitutes  an   S9   signal   !. 
+Alternatively,  it  is set to the dB_multiplier  divided  by  the 
+number of dB per S point, so in the previous example, if you want 
+4  dB  per  S point, set it to 20. Note that  there  are  several 
+'standards'  for the number of dB per S point,  all  vociferously 
+defended and justified. It is better to use the dBm scale.
+
+The  output of the RSSI needs to be connected to the ADC  in  the 
+TNC. The easiest way to do this is to use the squelch line in the 
+standard  TNC2  5  pin DIN connector ( pin 5 ).  This  signal  is 
+frequently unused in nodes. The RSSI output is connected to pin 5 
+in the radio, and in the TNC the signal is disconnected from  the 
+squelch circuits and connected instead to channel 2 of the ADC  ( 
+one  of the unused pads on the ADC ). In TNCs such as  the  BSX2, 
+the squelch signal is connected into the TNC circuits via a diode 
+that forms a logical AND gate with the modem DCD. The easiest way 
+to  disconnect  pin 5 from these circuits is to lift one  end  of 
+that diode.
+
+The lead from radio to TNC must be reasonably short as the output 
+impedance  of the RSSI is not low. If problems are found, an  op-
+amp buffer may need to be added to give a low impedance drive.
+
+When  exploring  the innards of radios looking for  suitable  tap 
+point, a degree of care and ingenuity will be needed. Finding one 
+with about the right signal level, prior to a limiter, after  the 
+main  bandpass  filter  and without undue loading  on  the  radio 
+circuits is not always easy.
+
+
+     << The plot of the calibration data is only in the word  for 
+     wondows file. See the file smeter.csv for the raw data >>
+
+        
+        
+                  Example Node heard list showing dBm format
+        
+        IPNET:G8KBB-5} 
+        Callsign    Pkts   Port  Time      Dev.   dBm   Type
+        G8KBB-2     1129   1     0:0:0                  Node TCP/IP
+        FELIX       869    0     0:0:6     5.7    -79  
+        G0JVU-2     4285   0     0:0:40    5.9    -78   Node TCP/IP
+        G7MNS       368    0     0:1:17    4.1    -89  
+        G8STW-5     6227   0     0:4:54    5.0    -102  TCP/IP
+        G1YRE       61     0     0:5:27    6.2    -82  
+        GB7MXM      326    0     0:7:6     5.8    -78  
+        FB1ICL      1      0     0:13:40   6.9    -104 
+        G0TMH-5     1      0     0:13:57   6.1    -107  TCP/IP
+        G0OEY-5     2288   0     0:14:10   6.1    -93   Node TCP/IP
+        G1DVU-5     1      0     0:18:39   7.6    -107  TCP/IP
+        G8HUE       90     0     0:21:50   5.5    -92  
+        G7BKO       1      0     2:0:14    7.0    -96  
+        G4ZEK-14    13     0     3:39:22   5.7    -79  
+        G0NJA       29     0     4:8:54    6.6    -91  
+        G7JVE-5     259    0     5:23:33   4.3    -105  TCP/IP
+        G8INE       5      0     8:11:28   6.3    -112 
+        G4IZC-5     69     0     8:26:29   6.8    -112  TCP/IP
+

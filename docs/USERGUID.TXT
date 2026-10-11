@@ -1,0 +1,425 @@
+                   USER GUIDE FOR TheNet X-1J
+        
+This  brief  note  is  intended for users  of  TheNet  X-1J,  and 
+explains the basic commands. Configuration and sysop features are 
+not covered fully.
+
+TheNet X-1J is an extension of TheNet 1, and provides a number of 
+new features.
+
+The switch provides the following user commands :
+
+                  Connect
+                  Info
+                  Nodes
+                  Routes
+                  Users
+                  Talk
+                  CQ
+                  BBS
+                  Host
+                  MHeard
+                  Bye
+                  DXcluster
+                  IProute
+                  ARP
+                  QUIT
+                  ADC
+        
+Not  all  commands  may be available on  every  node  as  certain 
+commands might have been disabled. If a command has been enabled, 
+it  will  be displayed when you type an invalid command  such  as 
+'?'. In  addition, there are some commands that are available but 
+are not usually displayed. The main ones of interest are :
+
+                  Links
+                  Mode
+                  Parms
+                  Stats
+                  IPAddress
+                  DXCAlias
+                  BBSAlias
+                  HostAlias
+                  MTU
+        
+The Sysop may have customised the command list according to local 
+needs.
+
+In  general, commands take parameters, for example to connect  to 
+GB7MXM,  the command to be entered is CONNECT GB7MXM followed  by 
+return. Usually, commands are not case sensitive, ( although node 
+aliases may be ) and commands may be abbreviated.
+
+Connect
+        
+     If  the connect command is given on its own,  then  assuming 
+     that  the  sysop  has  set it up  correctly,  you  will  get 
+     connected to the local BBS.
+     
+     If you give another callsign, either of a local station or a 
+     node,  the node will attempt to connect you to that  station 
+     either by a level 4 connection or by downlinking. If you are 
+     downlinking, you may also specify digipeaters.
+     
+     In  either  case, you get either a connected  message  or  a 
+     message telling you of the failure to connect. If you  enter 
+     any other command at this stage, the connection attempt will 
+     be aborted.
+     
+     If  you attempt to downlink with digipeating, or attempt  to 
+     downlink to an invalid callsign such as a node alias with an 
+     SSID,  you  may get an error message depending  on  how  the 
+     Sysop has configured the node.
+     
+     Finally, if you connect to the node, then connect to another 
+     station, and that station disconnects you ( e.g. connect  to 
+     a  BBS  and  use the 'Bye' command of the BBS  ),  you  will 
+     either   get  reconnected  to  the  node   or   disconnected 
+     completely depending on the configuration of the node.
+     
+     If you enter a node alias and get an 'invalid call' message, 
+     it  can either be because the node is not recognised  or  it 
+     can  be  because  the  Sysop  has  made  node  aliases  case 
+     sensitive.
+     
+Info 
+
+     This   command  gives  information  about  the  node  as   a 
+     combination  of a message stored in the EPROM and a  message 
+     entered by the Sysop.
+        
+Nodes
+        
+     This command gives information about the distant nodes  that 
+     this node thinks it can get to. With no parameter, it  shows 
+     the alias and callsign of all the nodes except those staring 
+     with a '#' character. If a parameter of '*' is given,  those 
+     'hidden' nodes will also be shown.
+     
+     If a callsign or alias is given that the node does not know, 
+     it  gives  an error message. If the callsign or alias  of  a 
+     known node is given, the node gives details of the routes it 
+     knows about that lead to that destination. The display shows 
+     one  option  per line, each of which consists  of  the  path 
+     quality,  obsolescence  count  and  port  followed  by   the 
+     callsign of the neighbour. If any route is in use, a chevron 
+     is shown against the appropriate entry.
+     
+     If  so  configured by the Sysop, 'Slime trails'  i.e.  nodes 
+     without  aliases that have not been the subject of  a  valid 
+     node broadcast, may be omitted from the nodes list.
+        
+Routes
+        
+     This command gives information about the neighbouring  nodes 
+     that can be heard. For each neighbour, the display shows the 
+     port  number, the callsign, the path quality and the  number 
+     of  nodes accessible through this neighbour. If a route  has 
+     been  'locked' by the sysop, then a '!'  character is  shown 
+     after  an entry. The sysop may have configured the  node  to 
+     display  nodes  as  callsign or  as  alias:callsign.  If  so 
+     configured,  then if a node is shown as a callsign alone  it 
+     means  that  is  it  not currently  reachable  as  its  node 
+     broadcasts are not being received.
+        
+Users
+        
+     This  shows  who is using the node. It does not  show  other 
+     nodes  that are using the node as a level 3 relay, nor  does 
+     it  show  those  users who have connected to  the  node  but 
+     otherwise have done nothing.
+     
+     The display shows the through connections, followed by those 
+     users  who are connected to the switch and 'idle'.  It  also 
+     shows  those  users who are connected  to  the  conferencing 
+     facility.  The  latter  stations are shown  connected  to  a 
+     destination   called   'Talk',  whilst  in   the   case   of 
+     connections,  the two endpoints are shown. For  connections, 
+     two symbols are used, '<-->' and '<..>'. The former is  used 
+     for  established connections whilst the latter is  used  for 
+     connections being established.
+     
+Talk
+        
+     The  Talk  command  allows  a  group  of  users  to  hold  a 
+     conference call. It also allows a user to send a message  to 
+     another user of the node provided that user is connected  to 
+     the switch but is not patched through to another station and 
+     is not currently trying to connect to another station.
+     
+     A  user enters the conference by giving the command  'talk'. 
+     He/she  gets a message informing them of this and  reminding 
+     them  that  the command to escape from the talk  command  is 
+     '/exit'.  Any other users currently in the conference get  a 
+     message  from the node telling them of the callsign  of  the 
+     user who has joined them. At this point, every line sent  by 
+     a user in the conference is copied to all other users in the 
+     conference, preceded by their callsign.
+     
+     To  exit from the conference, the command '/exit'  is  used. 
+     This  causes a response message to be sent to the user,  and 
+     at  the same time all of those left in the conference get  a 
+     message  from the node telling them of the station  who  has 
+     left  the conference. If you force a disconnect,  the  other 
+     stations are not told of your departure.
+     
+     A string of text may be entered on the same line as the talk 
+     command  when the command is given. If this is done,  before 
+     the user is connected to the conference, that string of text 
+     is sent to all the other users of the node who appear in the 
+     'user'  list  but are not connected to  anything  else.  For 
+     example if GxABC were to type :
+     
+          TALK GyXYZ, Hello fred can I have a chat - type TALK
+
+     then  other users of the node ( including  presumably  Fred, 
+     would get the message :
+        
+          GxABC>> GyXYZ. Hello fred can I have a chat - type TALK
+
+     on their screens. The only exception to this is that  sysops 
+     are not sent the message.
+     
+     Note that the TALK command will pass 8 bit data if set to by 
+     the Sysop.
+        
+CQ
+        
+     This command is used to broadcast a CQ message. In addition, 
+     the  fact that you are calling CQ is indicated in  the  USER 
+     list.  The callsign will be your own with a different  SSID, 
+     and  anyone  else can connect to you by  connecting  to  the 
+     callsign with the appropriate SSID.
+     
+     The  CQ  remains  'primed' for a while,  and  if  any  other 
+     command is given to the node the CQ will be cancelled.
+        
+BBS
+        
+     When you issue the BBS command, assuming that the sysop  has 
+     configured it, you will be connected to the local BBS.
+     
+     If  you enter the command 'BBS ?', then the current  setting 
+     of the BBS will be displayed.
+        
+Host
+        
+     The HOST command operates just like the BBS command. It  may 
+     have  been  disabled by the sysop, it may have been  set  to 
+     connect to the same station as the BBS, or it may have  been 
+     set to connect to another host system.
+     
+     If you enter the command 'HOST ?', then the current  setting 
+     of the HOST will be displayed. 
+
+MHeard
+        
+     If  enabled,  the  heard list shows the  last  few  stations 
+     heard. The number of entries is limited and set by the sysop 
+     so any stations not heard for a while may get pushed out  of 
+     the  list  by others heard. Assuming that a station  is  not 
+     pushed  out in this manner, the display shows the number  of 
+     packets  heard  from that station since it appeared  in  the 
+     list  and  the  time since it was last heard.  The  time  is 
+     hours, minutes and seconds. The list also shows the port  on 
+     which  the station was heard ( port 0 is the radio  port  ), 
+     and if it hears IP frames or Net/Rom frames, it adds a  note 
+     to show that the station is a node and/or a TCP/IP station.
+     
+     If  the list is long enough so that a station is  not  heard 
+     for 12 hours, it will get deleted anyway.
+     
+     The  list  may also show a column headed 'Dev.'.  This  will 
+     only  be  present where the sysop has added to  the  node  a 
+     small hardware board that measures the received signal audio 
+     level.  Specifically,  it gives an indication  of  the  peak 
+     audio  level. By means of a software  configuration  control 
+     and   prior  calibration,  this  gets  converted   into   an 
+     indication  of the transmitting station's signal  deviation. 
+     It  does this by sampling the audio level after every  valid 
+     packet.
+     
+     Care  must  be taken over its interpretation.  It  does  not 
+     measure  independently the two tone levels - it  is  assumed 
+     that whatever local standards that relate to pre-emphasis  ( 
+     i.e. use it or not ) have been implemented.
+     
+     Often,  packet  stations  are set up, and  the  audio  level 
+     tweaked until it appears to work reasonably error free.  The 
+     idea  of  this add-on is that, having done  that,  you  then 
+     connect  to  the node and display the heard list to  see  an 
+     indication  of  your actual deviation. It may then  be  fine 
+     tuned  to set it correctly. Local advice must be taken  over 
+     the  correct  setting as it depends on the  channel  spacing 
+     being used ( e.g. 12.5, 25 or other KHz ).
+     
+     The  meter  will  give the wrong  answer  on  the  following 
+     conditions :
+     
+       
+            A badly distorted audio signal
+            Badly off frequency
+            Incorrect adherence to local pre-emphasis standards
+            A noisy signal
+        
+     If  you connect, then correct your deviation to the  correct 
+     display then find performance has deteriorated, it indicates 
+     one of the above problems. It is not that the meter  doesn't 
+     work, it is an indication of a fault elsewhere.
+     
+     It  is in your own interest for those around you to use  the 
+     correct  deviation.  The  list also allows you  to  see  the 
+     deviation of others - so apply peer pressure if someone over 
+     or  under deviates. Remember it is NOT a case of the  higher 
+     or the lower the better - it is having the setting RIGHT.
+     
+     The system may also be used to migrate users towards a lower 
+     deviation in advance of moving to narrower channel spacing.
+     
+     The  heard list may also show received signal  strength.  It 
+     shows  how  strong  each station is  at  the  receiver.  The 
+     display will either be in dBm format or in the familiar  'S1 
+     to  S9' format ( or 'S9+' for big signals ).  To  understand 
+     this  properly  will need some guidance from the  sysop.  By 
+     looking at the METER parameters you can find the noise floor 
+     in  dBm, and if the display is in dBm can subtract one  from 
+     the other to find out how much stronger your signal is  than 
+     it  needs to be. How accurate this is depends on  the  radio 
+     and  its calibration. It could be as close as +- 1 dB or  it 
+     could be wildly wrong.
+     
+Links
+        
+     The LINKS command shows the level 2 connections to the node. 
+     This  is  usually  of academic interest, but  I  use  it  in 
+     testing. The display shows the links, one per line, with the 
+     two  callsigns,  the  link state, the port  number  and  the 
+     current number of retries.
+        
+Mode
+        
+     The MODE command is a bit like the PARMS command. It shows a 
+     number  of  additional parameters. These are as  follows  as 
+     shown by example :
+        
+       MODE
+       THENET:G8KBB-5> 0 1800 6 3 2 20 0 600 2 900 1 31 0 1 1 0 0
+
+     with the following meanings :
+        
+       0    Host mode protocol ( 0 = standard, 1 = DCD mode )
+       1800 CWID period. Delay in seconds between CWID
+       6    CWID speed 10's of msec per dot. 6 equals 20 wpm
+       3    Enable / disable nodes broadcasts mask.
+       2    RS232 protocol, 0 = crosslink, 1,2 or 3 are KISS
+       20   TxDelay in 10's of milliseconds ( Centiseconds ?? )
+       0    Full duplex control. 0 equals simplex
+       600  RS232 port nodes broadcast interval in seconds
+       2    Nodes broadcast algorithm port mask
+       900  Beacon period in seconds
+       1    'connect' redirector. 0 is to HOST, 1 is to BBS, 2 is 
+            to DXCluster
+       31   Each bit controls one of the 'user' help messages,  8 
+            bit TALK, case sensitivity & TexNet i/f
+       0    This byte controls the broadcasting of 'hash' nodes
+       1    This   byte  enables  /  disables  the  extra   alias 
+            operation
+       1    If set to '1', a remote disconnect on a circuit  will 
+            cause a node reconnection
+       0    The  bits of this controls the operation of the  node 
+            with regard to 'slime trails'
+       0    The  bits  of this control whether digi  uplinks  and 
+            downlinks are permitted
+        
+     If you want additional details, ask the sysop for a copy  of 
+     the overview guide.
+     
+Parms
+        
+     This shows the node parameters as per TheNet 1.01 ( I am not 
+     going to list them again here. Sorry ).
+        
+Bye and Quit
+        
+     These  commands disconnects you from the node,  closing  the 
+     link.  It  says goodbye before disconnecting you if  it  has 
+     been so configured by the sysop. Quit does just the same  as 
+     Bye does.
+        
+DXcluster
+        
+     If  there is a local DXcluster, this command may  have  been 
+     configured  by the sysop to connect you to it. It  therefore 
+     operates in a manner very similar to the BBS command.
+        
+Stats
+        
+     The  stats  command  gives  lots  of  data  about  the  node 
+     operation.   A  full  description  of  the  information   is 
+     contained in the overview document.
+        
+IProute
+        
+     This command is used by the sysop to configure the IP  route 
+     table. It may also be used to display the router table.
+        
+Arp
+        
+     This  command is similar to the IProute command,  but  shows 
+     the Arp table. The Arp table provides a translation from  IP 
+     address to callsign.
+        
+IPaddress
+        
+     This  command is used to set or display the current node  IP 
+     address.
+        
+BBSAlias
+HostAlias
+DXCAlias
+        
+     These  commands are used to set additional aliases  for  the 
+     node.  It can be configured by the sysop to  accept  connect 
+     requests  ( uplinks ) to the node callsign, the node  alias, 
+     or  the  3 aliases shown by these commands.  When  the  node 
+     accepts  a  connection  to one of  these  aliases,  it  will 
+     immediately  invoke the BBS, DXC or HOST commands  for  you. 
+     The  way this would normally be used is as follows.  Suppose 
+     your  local  ( for example ) BBS was not accessible  on  the 
+     frequency  that the node operates on. The BBS alias  can  be 
+     configured to provide easy access across other nodes to  the 
+     BBS. Hence in the case of the Ipswich nodes, GB7MXM does not 
+     have a port on 144.650, but the node IPS2 on 144.650 can get 
+     to it by means of another node and a 9600 baud link. If IPS2 
+     is  set to accept the extra aliases, and if BBSAlias is  set 
+     to MXMBBS, then anyone who tries to uplink to MXMBBS in  the 
+     Ipswich area would be automatically connected to GB7MXM.  It 
+     goes  without  saying that if GB7MXM had a port  on  144.650 
+     itself, then chaos would ensue. 
+     
+MTU
+
+     This command allows configuration of the MTUs for IP  users. 
+     The parameters have the following meanings :
+     
+     Parameter Default        Controls
+     ============================================================
+          1      256    The   MTU  for  the  radio  port,   AX.25 
+                        encapsulation
+          2      256    The   MTU  for  the  RS232  port,   AX.25 
+                        encapsulation
+          3      236    The MTU for the Net/Rom encapsulation
+          4      257    The  maximum  number of data bytes  in  a 
+                        received L2 frame
+          5      328    The maximum number of bytes in a received 
+                        L2 frame
+     
+     For  more details on the IP router, consult  the  'overview' 
+     document.
+     
+ADC
+        
+     This command is used to read up to 2 channels of DC voltage. 
+     Whether  they  are enabled, and what they read  is  a  local 
+     decision by the Sysop.
+

@@ -1,0 +1,135 @@
+                  BANKSWITCHING FOR TheNet X-1
+
+What  follows  is two versions of how to  do  the  bankswitching. 
+Saying things in two different ways is a neat way of making  sure 
+that ambiguities are exposed, so here goes. The first version  is 
+by me, the second by Bob G8HBE.
+
+At  the  end  of these descriptions, is a  note  by  Al,  WB0YRQ, 
+describing  how  to  modify  the  MFJ1270C.  My  thanks  for  the 
+information.
+
+If  you  receive  CQ magazine, I  would  recommend  the  detailed 
+drawings and modifications published by Buck Rogers in his column 
+for  clear  instructions on implementing  bankswitching  and  the 
+deviation meter PCB.
+
+=================================================================
+
+For  the  reduced TNC2 version, the instructions  are  simply  as 
+follows :
+
+1.   Bend out pin 1 of the EPROM so that when inserted  into  the  
+     socket it will not contact pin 1 of the socket  or any other 
+     pin.
+        
+2.   Connect  a wire from the SIO-0 DTRA pin ( pin 16  )  to  the  
+     bent   out  pin ( pin 1 ) of the  eprom.  The   DTRA  signal  
+     should  also appear on pin 8 of the  TAPR  modem  disconnect 
+     header.
+        
+The  status  led will flicker as it now shows the  state  of  the 
+bankswitch signal.
+
+One  word of caution - if you can, just check the signal on pin 1 
+of the eprom - make sure it switches fast and cleanly - i suspect 
+that if it does not, errors will occur.
+
+=================================================================
+                                                     Robert Smith
+                                                 38 Norris Close,
+                                                       Chiseldon,
+                                                       Nr Swidon,
+                                                       Wiltshire.
+                                                          SN4 0LR
+        
+                                                   6 October 1991
+        
+BANKSWITCHING for TheNet X1
+
+So  that the 27C512 does not get damaged by the bending of pin  1 
+and  soldering  it I have made the modification to  the  TNC-200, 
+Tiny 2 and MFJ1274 type TNC's as follows.
+
+To  modify your TNC you will require a piece of  thin  connecting 
+wire about 100 mm long and a 28 pin IC socket,  you may also need 
+a little bit of inserlating tap.
+
+Before starting the modification make sure that power to the  TNC 
+has  been disconnected and that the lithium battery link as  been 
+removed.
+
+Remove the 27C256, U23 in a MFJ1274/TNC200 or U2 on a Tiny 2  and 
+put it in a safe place.
+
+Taking your New 28 pin IC socket, bend pin 1 outwards and  solder 
+the end of the wire to the bent out pin.
+
+Plug  the  IC socket into the socket you took  the  27C256  from, 
+making sure that you plug it in the correct way round.
+
+Depending  on  the type of IC socket that is mounted  on  the  PC 
+board  you may find that pin 1 on both IC sockets may touch,   if 
+this seems to be the case put a little pieces of inserlating  tap 
+between them.
+
+Also on the Tiny 2 make sure that the bent pin does not touch the 
+CPU chip.
+
+Now  connect the other end of the wire to pin 16 on the  Z80  SIO 
+chip.
+
+This  signal can also be found on pin 8 of the  modem  disconnect 
+header which is J5 on a Tiny 2, also the same signal can be found 
+on  pin  5  of U6 (74HC14) on the Tiny 2. On  a  TNC200  you  can 
+connect the wire to the side of R51 nearest U23, this is just  20 
+mm from pin 1 of U23 on the TNC200 board.
+
+If in doubt use a test meter and check the continuity from pin 16 
+on  the Z80 SIO chip to the point where you are going  to  solder 
+the wire.
+
+Once  you have done this you can plug the new  27C512  Programmed 
+with TheNet X into the new mounted IC sockets.
+
+Re-insert the lithium battery link, Connect your computer to  the 
+RS232  socket,  12  volts to the TNC and switch  on,  if  all  is 
+working  well  the the STA light will be flickering and  after  a 
+second a message will appear on you screen.
+
+Modification complete.
+G8HBE    6-Oct-91
+_________________________________________________________________
+
+
+To   modify  the  MFJ-1270C  for  use  with   X1J/TheNet   EPROMS 
+follow these instructions:
+
+You  must  complete  all  of  these  steps  in order for  Net/Rom 
+firmware to function.
+ 
+NOTE:  if  you are not using X1J firmware skip the first step and 
+make sure that JP15 is set for 256k.
+
+Step 1: Bend  pin  1 of 27c512 out so it will not  touch  socket, 
+        then jumper pin 1 of 27c512 to pin 8 of MODEM header  J4. 
+        (see X1J docs)
+        
+Step 2: Remove  U40. Add jumper from pin 16 to pin 1 (ground  pin 
+        16)
+        
+Step 3: Remove JMP9 altogether  (no jumper on any pins)
+        
+Step 4: Cut JMPX "PAD" to prevent node from hearing itself
+        
+Step 5: Add  100ohm  resistors to R14 and R15 if not  already  in 
+        place.
+        
+This  information  came  directly from MFJ and  I  have  used  it 
+successfully. Hope this helps you.
+
+73's de Al WB0YRQ @ NF0N.#NENE.NE.USA.NA
+Akron, Iowa. 712-568-2810  GRID <EN12RT> 
+TCP/IP 44.50.2.6
+Internet: SCHEMMERAL@BVC.EDU
+

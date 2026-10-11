@@ -1,0 +1,107 @@
+                INTRODUCING TheNet X-1J Release 2
+        
+This  is probably the last version of TheNet X-1. I  have  agreed 
+with  Bill  Beech,  NJ7P, that we will join  forces  for  further 
+versions,  taking the best of TheNet Plus 2 and TheNet  X-1.  The 
+new ( composite ) will be called TheNet X-plus 3.
+
+This  version  is a modification to TheNet X-1J  and  includes  a 
+small  number  of changes that I had promised. I  am  aware  that 
+there are many other ideas that have been proposed such as  DAMA. 
+These  will  be  input to the wish-list for  the  joint  version. 
+Specifically the changes from TheNet X-1J are :
+
+       
+     * An S-meter function in the heard list
+     * A Voltmeter function for the other two ADC channels
+     * Support for the TexNet '*** LINKED to' syntax
+     * A bug fix to the BBS, ALIAS and DXCLUSTER commands
+     * The ability to change the user's command prompt list
+     * The ACL function has had a feature added to speed it up
+        
+The  S-meter  is  a companion to  the  deviation  meter  function 
+created  in TheNet X-1J. With TheNet X-1J, an add-on card  for  a 
+TNC2 clone provided 4 channels of analogue reading capability  to 
+the  node.  To  the deviation meter function  is  added  received 
+signal  strength  and  two channels of  DC  voltage  measurement. 
+Remote  stations' deviation and signal strength ( in dBm  or  'S-
+meter' format ) are shown against each station in the heard list. 
+The  DC  voltage reading function can be  configured  to  display 
+voltage,  temperature  or  a  number  of  similar   measurements. 
+Callsign matching has been speeded up to help ACL searching.
+        
+The  change to the user command list allows the sysop to  control 
+which  commands  are shown in the error prompt as well  as  which 
+commands are enabled.
+
+If  you use the ACL system, it is essential that you consult  the 
+overview guide to understand the changes.
+        
+A menu driven windowing patch utility with context sensitive help 
+is included.
+
+Utilities for printing passwords in a sysop-friendly manner and a 
+utility  for changing the help text attributable to  John  Bednar 
+WB3ESS  are  also  provided. Modifications for  the  MFJ1278C  by 
+WB0YRQ are included in the bankswitching details.
+
+The previous releases introduced the following :
+        
+   A complete IP router,
+   The Receive Deviation meter,
+   Control of 'Slime Trails',
+   Information text messages 160 characters long,
+   Multiple line INFO, CTEXT and BTEXT messages,
+   Nodes broadcasts occur 60 seconds after power up,
+   Optional reconnect to the node after remote disconnect,
+   PARMS, MODE etc may be managed by offset & value,
+   Digipeat uplink & downlinks may be selectively enabled,
+   Level 4 retries ( min ) is now 1,
+   An MTU command allows MTU settings to be changed for IP use,
+   Node alias handling is optionally case sensitive,
+   TALK will optionally pass 8 bit data,
+   The RESET bug in versions prior to TheNet X-1J has been cured,
+   The ability to remotely set the node's alias,
+   The ability to listen for 3 extra aliases & invoke BBS etc,
+   Selective node broadcast control for 'hash' nodes,
+   A UI command to send arbitrary UI commands,
+   Access control list capabilities,
+   Multi-user conferencing ( the 'TALK' command ),
+   A CWID keyer,
+   Better SYSOP authentication,
+   MHeard list showing callsigns, packets heard & time since last heard,
+   MHeard list shows whether a station is a node and / or TCP/IP station,
+   A Closedown command to remotely shut the node down,
+   A DXCluster command that operates like the BBS & Host commands,
+   A Btext command to set the node's beacon text message,
+   A Ctext command to set an optional alias connect text message,
+   The ability to enable or disable any command,
+   Improved command prompting with only valid commands shown,
+   Routes show optionally as alias:callsign or callsign alone,
+   Additional control over system reset,
+   KISS as an alternative to the crosslink protocol,
+   Hardware handshake controlled host mode operation,
+   MODE command for configuring additional parameters,
+   BBS command to auto connect to a remote BBS,
+   HOST command to auto connect to another BBS or Host,
+   BYE or QUIT commands to disconnect,
+   STATS command to display internal statistics,
+   MANAGER command for system manager access,
+   AUDIT command to set system audit levels,
+   Bug fixes ( e.g. info messages too long crashing the node ),
+   Changes to the NODES command,
+   An improved nodes broadcast algorithm for the crosslink port,
+   Split port nodes broadcast intervals,
+   Ability to enable & disable nodes broadcasts selectively on each port,
+   CQ apologises nicely if disabled,
+   Most Escape commands have been replaced with MODE parameters,
+   Beacon messages may be digi'd,
+   CALIBRATE command for remote checking of Tx deviation,
+   LINKS command to show current level 2 links,
+   Configuration of the beacon period,
+   Auto routing of 'connect' to either BBS, DXCluster or HOST,
+   Remote dump of entire neighbour lists for all nodes.
+
+Dave G8KBB @ GB7MXM
+QTHR
+

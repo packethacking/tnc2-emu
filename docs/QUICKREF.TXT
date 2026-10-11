@@ -1,0 +1,236 @@
+                THENET X1-J QUICK REFERENCE GUIDE
+==================================================================
+                         SWITCH COMMANDS
+
+ACL       [{CALLSIGN + VALUE} | {CALLSIGN - VALUE} | 
+          { * VALUE } | { & value }]
+ADC
+ADC1      [ * | Units_for_Voltmeter_channel_1 ] (see note 6)
+ADC2      [ * | Units_for_voltmeter_channel_2 ] (see note 6)
+ALIAS     [ * | NEW_ALIAS ]
+ARP       [ipaddr [{ - ptcl } | [+ [P] ptcl callsign [ DG | VC ]]]
+AUDIT     [ NUMBER_FROM_0_TO_255 ]
+BBS       [ CALLSIGN | * | ? ]
+BBSALIAS  [ * | NEW_ALIAS ]
+BTEXT     [ * | BEACON_MESSAGE_TEXT ] (see note 6)
+BYE
+CALIBRATE [PERIOD_VALUE_FROM_1_TO_60 [TOGGLE_VALUE_1_TO_PERIOD  ]]
+CLOSEDOWN A
+CONNECT   [ CALLSIGN [ [V] DIGILIST ... ]
+CQ        [ MESSAGE_FOR_CQ_PACKET ]
+CTEXT     [ * | CONNECT_MESSAGE_TEXT ] (see note 6)
+DXCLUSTER [ CALLSIGN | * | ? ]
+DXCALIAS  [ * | NEW_ALIAS ]
+HELP
+HOST      [ CALLSIGN | * | ? ]
+HOSTALIAS [ * | NEW_ALIAS ]
+INFO      [ SYSOP_SET_MESSAGE ] (see note 6)
+IPADDRESS [ NEW_IP_ADDRESS ]
+IPBROADCAST [ NEW_IP_ADDRESS ]
+IPROUTE   [ipaddr [/bits ] [ - | { + port [ipgateway [metric ]]]]
+IPSTATS   [ { NEWPARAM | * } { NEWPARAM | * } ..... ] (see note 5)
+LINKS
+MANAGER
+METER     [ { new_value | * } ... ] (see note 5)
+MHEARD    [ NUMBER_FROM_1_TO_100 ]
+MODE      [ { NEWPARAM | * } { NEWPARAM | * } ..... ] (see note 5)
+MTU       [ list_of_parameters ] (see note 5) 
+NODES     [* [*] | NODECALL {+|-} IDENT QUAL COUNT PORT NEIGHBOUR
+          [DIGIS]]
+PARMS     [ { NEWPARAM | * } { NEWPARAM | * } ..... ] (see note 5)
+QUIT
+RESET     [ ANY_CHARACTER ]
+ROUTES    [ PORT NODECALL [ DIGILIST ... ] { + | - }  PATHQUALITY ]
+STATS
+SYSOP
+TALK      [ STRING ]
+UI        DEST   STRING_OF_TEXT_TO_BE_SENT_IN_UI_FRAME
+USERS
+------------------------------------------------------------------
+        
+Note 1 Any  command may be enabled or disabled by the use of  the 
+       '+' or '-' modifier, as shown below :
+
+          ANY_COMMAND   [ + | - | THAT_COMMANDS_PARAMETERS ]
+
+       Commands  may  be  caused to be displayed or  not  in  the 
+       prompt  screen if the '-' or '+' is followed by 'D'  (  or 
+       'd' )
+
+Note 2 IP addresses are of the form nnn.nnn.nnn.nnn 
+       where nnn is a number 0..255
+
+Note 3 IProute port parameter is 0 for radio or 1 for rs232
+
+Note 4 ARP   ptcl   parameter  is  AX.25  or  Net/Rom   (may   be 
+       abbreviated)
+
+Note 5 The  commands  will  accept the 'old' syntax  of  '*  *  * 
+       value...'  or  the  new  offset  &  value  syntax  of   '/ 
+       parameter_number value'
+        
+                     HOST 'ESCAPE' COMMANDS
+        
+<escape> C
+<escape> D
+<escape> P  [ NEW_PASSWORD ]
+
+==================================================================
+        
+UNDERSTANDING ACL VALUES              UNDERSTANDING AUDIT BITS
+-----------------------------------------------------------------
+Bit   Function                  | Bit    Function
+================================|================================
+ 0  Bar all incoming L2 connects|  0 Issue L1 stats every 10 mins
+ 1  Bar outgoing L2 downlinks   |  1 Audit L2 connects & discs
+ 2  Ignore nodes broadcasts     |  2 unused
+ 3  Bar gatewaying at level     |  3 Audit L4 connects & discs
+ 4  Bar incoming L4 connect     |  4 Audit L7 use of sysop cmd
+ 5  Bar outgoing L4 connects    |  5 Audit all L7 switch commands
+ 6  Ignore SSID in searching    |  6 Issue CPU stats every 10mins
+ 7  unused                      |  7 unused
+
+==================================================================
+        
+                        PARMS PARAMETERS
+
+Number Min   Max  Function
+-----------------------------------------------------------
+  1     1    400  Maximum number of destination nodes
+  2     0    255  Minimum quality for auto update
+  3     0    255  HDLC ( radio, port 0 ) default quality
+  4     0    255  RS232 ( crosslink, port 1 ) default quality
+  5     0    255  Initial value for obsolescence counter
+  6     1    255  Minimum obsolescence for node broadcast
+  7     0  65535  Auto update broadcast interval (seconds)
+  8     0    255  Level 3 ( network ) Time To Live Initialiser
+  9     5    600  Level 4 ( transport ) timeout (seconds)
+ 10     1    127  Level 4 ( transport ) retries
+ 11     1     60  Level 4 ( transport ) ack delay (seconds)
+ 12     1   1000  Level 4 ( transport ) busy delay (seconds)
+ 13     1    127  Level 4 ( transport ) window size (frames)
+ 14     1    127  Level 4 ( transport ) congestion ctrl threshold
+ 15     0  65535  Level 7 ( switch ) inactivity timeout (seconds)
+ 16     0    255  Persistance for transmit delay
+ 17     0    127  Persistance slottime delay (10's of msecs)
+ 18     1     15  Level 2 ( link ) T1 timeout, ie FRACK (seconds)
+ 19     1      7  Level 2 ( link ) window size (packets)
+ 20     0    127  Level 2 ( link ) retries
+ 21     0   6000  Level 2 ( link ) T2 timeout (10's of msecs)
+ 22     0  65535  Level 2 ( link ) T3 timeout (10's of msecs)
+ 23     0      1  Level 2 ( link ) digipeat enable flag
+ 24     0      1  Callsign validation flag
+ 25     0      2  Node beacon ctrl (0=off, 1=if active, 2=always)
+ 26     0      1  CQ broadcasts enable flag
+
+==================================================================
+                               MODE PARAMETERS
+Number Min    Max  Function
+-----------------------------------------------------------
+  1      0      1  Hardware handshake host control mode flag
+  2      0   3600  CWID repeat period ( seconds )
+  3      4     10  CWID speed ( 10's msecs per dot )
+  4      0      3  Nodes broadcast channel enable flags where
+                   0=none, 1=HDLC only, 2=RS232 only, 3=Both ports
+  5      0      3  Crosslink protocol selection
+                   0=crosslink, 1=KISS, 
+                   2=KISS+selective copy, 3=KISS+allcopy
+  6      0    255  TX keyup delay ( 10's of milliseconds )
+  7      0      1  Full duplex enable flag
+  8      0  65535  RS232 ( port 1 ) node broadcast period ( secs )
+  9      0      3  Node broadcast algorithm control flags
+                   0=off, 2=RS232 port, 1 & 3 not normally used
+ 10    600   3600  Beacon interval ( seconds )
+ 11      0      2  Connect redirection to BBS flag
+ 12      0    255  Help messages flags, 8 bit TALK, case & TEXNET
+ 13      0      3  Hash node broadcast disable (one bit per port)
+ 14      0      1  Enable extra aliases monitoring if set
+ 15      0      1  Enable auto reconnect to node after remote dis
+ 16      0      3  Slime trail control. Each bit controls...
+                   Bit 0 if set hides slime trails in nodes list
+                   Bit 1 if set causes slime trails to be ignored
+ 17      0      3  Digipeat control. Each bit controls ...
+                   Bit 0 set makes node to refuse digi'd L2 uplink
+                   Bit 1 set, node refuses to allow digi downlinks
+======================================================== ==========
+                              IPSTAT PARAMETERS
+Number Min    Max  Function  ( Those marked '*' are not used )
+-----------------------------------------------------------
+  1      0      3  ip L2 AX.25 Modes ( 1 bit per port, 1=DG )
+  2      0      1  ip Forwarding, 1=enable router, 0=disable
+  3      2    255  ip Default TTL
+  4      0      0  ip In Receives
+  5      0      0  ip In Header Errors
+  6 *    0      0  ip In Address Errors
+  7      0      0  ip Forwarded Datagrams
+  8      0      0  ip In Unknown Protocols
+  9 *    0      0  ip In Discards ( TTL exceeded )
+ 10 *    0      0  ip In Delivers
+ 11      0      0  ip Output Requests
+ 12 *    0      0  ip Output Discards
+ 13      0      0  ip Output No Routes
+ 14 *    1     30  ip Reasm Timeout
+ 15 *    0      0  ip Reasm Requireds
+ 16 *    0      0  ip Reasm OKs
+ 17 *    0      0  ip Reasm Fails
+ 18      0      0  ip Frag OKs
+ 19 *    0      0  ip Frag Fails
+ 20      0      0  ip Frag Creates
+=================================================================
+
+                                MTU PARAMETERS
+Number Min    Max  Function
+-----------------------------------------------------------
+ 1      64   1024  IP Port 0 ( Radio Port ) Level 2 AX.25 MTU
+ 2      64   1024  IP Port 1 ( RS232 Port ) Level 2 AX.25 MTU
+ 3      64    236  IP Net/Rom port MTU
+ 4     257   1025  Level 2 Max data bytes in a packet before error
+ 5     328   1096  Level 2 Total max packet size in bytes
+
+=================================================================
+        
+                               METER PARAMETERS
+Number Min    Max  Function
+-----------------------------------------------------------
+ 1       0    511  The meter mode flags
+ 2       0    255  The deviation meter scaling factor
+ 3       0    255  The signal strength meter noise floor value
+ 4       0    255  The S meter display format multiplier
+ 5       0    255  The dBm meter display format multiplier
+ 6       0    255  The dBm noise floor value
+ 7       0    255  The voltmeter channel 1 multiplier 
+ 8       0    255  The voltmeter channel 2 multiplier
+ 9       0    255  Voltmeter Channel 1 offset value
+10       0    255  Voltmeter Channel 2 offset value
+
+==================================================================
+
+                  THE METER MODE FLAGS ( METER parameter 1 )
+        
+BIT       If set, then ....
+-----------------------------------------------------------
+ 0        The deviation meter is enabled
+ 1        The signal strength meter is enabled
+ 2        The signal strength is shown as S points rather than dBm
+ 3        ADC channel 3 is enabled ( voltmeter channel 1 )
+ 4        ADC channel 4 is enabled ( voltmeter channel 2 )
+ 5        Voltmeter channel 1 divisor is 1000 rather than 100
+ 6        Voltmeter channel 2 divisor is 1000 rather than 100
+ 7        Voltmeter channel 1 display resolution is 0.1 not 1.0
+ 8        Voltmeter channel 2 display resolution is 0.1 not 1.0
+
+==================================================================
+        
+                  HELP MESSAGES FLAGS ( MODE Parameter 12 )
+
+BIT       FUNCTION
+-----------------------------------------------------------
+0         If set, the 'please wait, trying xxxx' operates
+1         If set, all commands appear in help for sysop
+2         If set, the 'goodbye' message is given
+3         If set, a welcome message is enabled ( CTEXT )
+4         If set, nodes are shown as 'alias:callsign'
+5         If set, TALK data is passed as 8 bit data
+6         If set, node aliases are deemed to be case sensitive
+7         If set, enables the TexNet "*** LINKED to" interface
+

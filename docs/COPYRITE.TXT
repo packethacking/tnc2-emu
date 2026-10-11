@@ -1,0 +1,16 @@
+The software on this disk is for use in amateur radio only. 
+It may not be used for commercial applications. 
+For this purpose, you are free to make as many copies of this 
+software and the documentation as you wish, provided that its 
+source is acknowledged.
+
+The software and documentation for TheNet X-1J are copyright Dave 
+Roberts, G8KBB, 1993.
+
+The design of the deviation meter and its documentation are copyright
+Neville Pattinson, G0JVU, 1993.
+
+The original software on which this is based is TheNet 1.01, by
+NORD<>LINK, DF2AU & DC4OX.
+
+

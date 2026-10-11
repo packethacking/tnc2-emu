@@ -1,0 +1,7 @@
+[package]
+name = "tnc2-emu"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rustzx-z80 = "0.16.0"
