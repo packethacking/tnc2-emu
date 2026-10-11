@@ -1,0 +1,10 @@
+XRouter image ghcr.io/packethacking/xrouter:505c-amd64, emulator image tnc2-emu:dev, run at 2026-10-11T10:08:31Z
+PASS: TheNet console connects CONNECTED to
+PASS: TheNet PARMS answers (radio quality 192 and broadcast interval 60 s, as patched)
+PASS: XRouter lists TheNet as a neighbour (ROUTES) 
+PASS: XRouter lists TheNet as a node (NODES) 
+PASS: TheNet lists XRouter in NODES 
+PASS: L2 connect XRouter -> TheNet callsign gets TheNet prompt looked for 'TNET:G9TNT-1}'
+PASS: NET/ROM connect XRouter -> TheNet alias prompt 'TNET:G9TNT-1}': True, CONN REQ/ACK on the wire: True
+PASS: NET/ROM connect TheNet -> XRouter alias XRouter prompt: True, CONN REQ/ACK on the wire: True
+PASS: L2 downlink TheNet -> XRouter PMS callsign UA from G9XRT-2 on the wire: True, PMS answered: True

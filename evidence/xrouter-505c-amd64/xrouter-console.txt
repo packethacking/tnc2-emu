@@ -1,0 +1,169 @@
+
+[2026-10-11T10:04:13Z new telnet session]
+
+Xrouter v505c
+
+Callsign: 
+[2026-10-11T10:04:13Z >>> G9ABC]
+G9XRT XRouter interop node for TheNet X1J
+
+[2026-10-11T10:04:14Z >>> VERSION]
+
+G9XRT:XRNODE} XrLin multi-protocol router, 64-bit v 505c [static] (15/3/26)
+Copyright (c) Paula G8PZT 1996-2026  All rights reserved
+
+[2026-10-11T10:04:16Z >>> PORTS]
+
+G9XRT:XRNODE} Ports:
+
+  1 TNC2 radio channel
+
+
+[2026-10-11T10:04:38Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+(End of list)
+
+[2026-10-11T10:04:40Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+
+0 nodes found
+
+[2026-10-11T10:05:04Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+(End of list)
+
+[2026-10-11T10:05:06Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+
+0 nodes found
+
+[2026-10-11T10:05:30Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+(End of list)
+
+[2026-10-11T10:05:33Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+
+0 nodes found
+
+[2026-10-11T10:05:57Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+Port Callsign  Qty Nod RF
+   1 G9TNT-1   192   1  Y 
+(End of list)
+
+[2026-10-11T10:05:59Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+
+0 nodes found
+
+[2026-10-11T10:06:23Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+Port Callsign  Qty Nod RF
+>  1 G9TNT-1   192   1  Y 
+(End of list)
+
+[2026-10-11T10:06:25Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+   TNET:G9TNT-1   
+
+1 nodes found
+
+[2026-10-11T10:06:31Z >>> NODES TNET]
+
+G9XRT:XRNODE} Nodes:
+Info for: TNET:G9TNT-1  FR=1
+
+Routes to: TNET:G9TNT-1
+  Qty Obs Pt Via          Stt  Hop Obs2 RF
+> 192  5   1 G9TNT-1      0.60  1   5   Y <
+
+[2026-10-11T10:06:33Z >>> LINKS]
+
+G9XRT:XRNODE} AX25 L2 Links:
+
+ Remote     Local      Prt  Sta  V  Try   T3  Pac  Max  Idle  Txq  Rxq  Id
+ G9TNT-1    G9XRT        1    5  2    0  160  120    2    32    0    0  1
+(End of list)
+
+[2026-10-11T10:06:35Z >>> C 1 !G9TNT-1]
+
+G9XRT:XRNODE} Trying G9TNT-1...
+
+G9XRT:XRNODE} Connected to G9TNT-1
+
+[2026-10-11T10:06:41Z >>> NODES]
+TNET:G9TNT-1} Nodes:
+XRNODE:G9XRT       
+
+[2026-10-11T10:06:47Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+
+[2026-10-11T10:06:52Z xrouter closed the connection]
+
+[2026-10-11T10:06:52Z new telnet session]
+
+Xrouter v505c
+
+Callsign: 
+[2026-10-11T10:06:52Z >>> G9ABC]
+G9XRT XRouter interop node for TheNet X1J
+
+[2026-10-11T10:06:53Z >>> C TNET]
+
+G9XRT:XRNODE} Trying G9TNT-1...
+
+G9XRT:XRNODE} Connected to G9TNT-1
+
+[2026-10-11T10:07:00Z >>> ROUTES]
+TNET:G9TNT-1} Routes:
+> 0 XRNODE:G9XRT 192 1
+
+[2026-10-11T10:07:07Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+
+[2026-10-11T10:07:12Z xrouter closed the connection]
+
+[2026-10-11T10:07:12Z new telnet session]
+
+Xrouter v505c
+
+Callsign: 
+[2026-10-11T10:07:12Z >>> G9ABC]
+G9XRT XRouter interop node for TheNet X1J
+
+[2026-10-11T10:08:28Z >>> NODES]
+
+G9XRT:XRNODE} Nodes:
+
+   TNET:G9TNT-1   
+
+1 nodes found
+
+[2026-10-11T10:08:30Z >>> ROUTES]
+
+G9XRT:XRNODE} Routes:
+
+Port Callsign  Qty Nod RF
+>  1 G9TNT-1   192   1  Y 
+(End of list)

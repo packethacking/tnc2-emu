@@ -1,0 +1,3 @@
+# Example only: any valid callsign may log in on telnet without a password.
+# Keep the telnet port on localhost, as docker-compose.yml does.
+0.0.0.0/0 1

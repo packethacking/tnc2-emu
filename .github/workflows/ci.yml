@@ -11,8 +11,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and test
         run: cargo test --release --locked
-      - name: Build the Docker image
-        run: docker build -t tnc2-emu:ci .
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and smoke test the image on each platform
+        run: |
+          for p in linux/amd64 linux/arm64 linux/arm/v7; do
+            docker buildx build --platform "$p" --load -t tnc2-emu:smoke .
+            docker run -d --name tnc2-smoke --platform "$p" -p 127.0.0.1:18002:8002 tnc2-emu:smoke
+            python3 tools/console.py 127.0.0.1 18002 PARMS | tee /tmp/smoke.txt
+            docker rm -f tnc2-smoke
+            grep -q "CONNECTED to G8KBB-5" /tmp/smoke.txt
+          done
 
   interop:
     needs: build

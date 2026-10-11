@@ -190,6 +190,31 @@ fn fnv(data: &[&[u8]]) -> u64 {
 
 const RAM_MAGIC: &[u8; 8] = b"TNC2RAM1";
 
+static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+extern "C" fn on_signal(_: libc::c_int) {
+    STOP.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// SIGTERM / SIGINT: save the RAM and exit (we may be PID 1 in a container).
+fn install_signal_handlers() {
+    unsafe {
+        libc::signal(libc::SIGTERM, on_signal as *const () as libc::sighandler_t);
+        libc::signal(libc::SIGINT, on_signal as *const () as libc::sighandler_t);
+    }
+}
+
+fn save_ram(path: &str, fingerprint: u64, ram: &[u8]) {
+    let mut d = Vec::with_capacity(16 + ram.len());
+    d.extend_from_slice(RAM_MAGIC);
+    d.extend_from_slice(&fingerprint.to_le_bytes());
+    d.extend_from_slice(ram);
+    let tmp = format!("{path}.tmp");
+    if fs::write(&tmp, &d).and_then(|_| fs::rename(&tmp, path)).is_err() {
+        eprintln!("ram: could not save {path}");
+    }
+}
+
 struct Board {
     rom: [Vec<u8>; 2],
     ram: Vec<u8>,
@@ -322,6 +347,7 @@ fn hex(b: &[u8]) -> String {
 
 fn main() {
     let cfg = parse_args();
+    install_signal_handlers();
     if cfg.debug {
         sio::log::DEBUG.store(true, std::sync::atomic::Ordering::Relaxed);
     }
@@ -475,15 +501,17 @@ fn main() {
         if let Some(path) = &cfg.ram_file {
             if last_save.elapsed() > Duration::from_secs(5) {
                 last_save = Instant::now();
-                let mut d = Vec::with_capacity(16 + 0x8000);
-                d.extend_from_slice(RAM_MAGIC);
-                d.extend_from_slice(&fingerprint.to_le_bytes());
-                d.extend_from_slice(&board.ram);
-                let tmp = format!("{path}.tmp");
-                if fs::write(&tmp, &d).and_then(|_| fs::rename(&tmp, path)).is_err() {
-                    eprintln!("ram: could not save {path}");
-                }
+                save_ram(path, fingerprint, &board.ram);
             }
+        }
+
+        if STOP.load(std::sync::atomic::Ordering::Relaxed) {
+            if let Some(path) = &cfg.ram_file {
+                save_ram(path, fingerprint, &board.ram);
+                eprintln!("ram: saved {path}");
+            }
+            eprintln!("{} tnc2-emu: power off", utc_now());
+            std::process::exit(0);
         }
 
         if cfg.debug && last_debug.elapsed() > Duration::from_secs(5) {

@@ -1,3 +1,4 @@
 target/
 *.ram
 *.ram.tmp
+__pycache__/

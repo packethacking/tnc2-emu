@@ -1,0 +1,13 @@
+* C
+C XRNODE
+TNET:G9TNT-1} Connected to XRNODE:G9XRT
+NODES
+
+G9XRT:XRNODE} Nodes:
+
+   TNET:G9TNT-1   
+
+1 nodes found
+BYE
+
+G9XRT:XRNODE} Goodbye

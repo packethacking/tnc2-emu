@@ -1,0 +1,52 @@
+# A 1990s TheNet X1J node and a modern XRouter node, linked over TCP KISS.
+#
+#   docker compose up -d
+#   nc localhost 8002        TheNet console: press Escape, then C and Enter
+#   telnet localhost 8023    XRouter: log in with any callsign
+#
+# After a few minutes each node lists the other in NODES (TheNet sends its
+# first broadcast a minute after power on, then every 5 minutes here). From XRouter
+# try "C TNET"; from TheNet try "C XRNODE".
+#
+# Change the callsigns below to your own before linking either node to a real network.
+
+name: tnc2-example
+
+services:
+  thenet:
+    image: ghcr.io/packethacking/tnc2-emu:${TNC2_TAG:-latest}
+    environment:
+      TNC2_CALL: G9TNT-1
+      TNC2_ALIAS: TNET
+      # PARMS 3 (radio port quality) = 192 and PARMS 7 (NODES interval) = 300 s
+      TNC2_POKE: "4C=C0,00;54=2C,01"
+    volumes:
+      - thenet-data:/data
+    ports:
+      - "127.0.0.1:8002:8002"
+    networks:
+      radio:
+        ipv4_address: 172.29.74.10
+
+  xrouter:
+    image: ghcr.io/packethacking/xrouter:latest
+    depends_on: [thenet]
+    volumes:
+      - xrouter-data:/data
+      - ./XROUTER.CFG:/data/XROUTER.CFG:ro
+      - ./ACCESS.SYS:/data/ACCESS.SYS:ro
+    ports:
+      - "127.0.0.1:8023:23"
+    networks:
+      radio:
+        ipv4_address: 172.29.74.11
+
+volumes:
+  thenet-data:
+  xrouter-data:
+
+networks:
+  radio:
+    ipam:
+      config:
+        - subnet: 172.29.74.0/24

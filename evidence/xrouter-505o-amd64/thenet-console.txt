@@ -1,0 +1,244 @@
+
+[2026-10-11T09:59:03Z >>> ESC]
+* 
+[2026-10-11T09:59:03Z >>> C]
+C
+
+
+
+CONNECTED to G9TNT-1
+
+
+[2026-10-11T09:59:04Z >>> PARMS]
+PARMS
+
+TNET:G9TNT-1}  100 10 192 255 7 5 60 10 300 2 6 180 4 4 900 64 10 5 2 10 100
+
+18000 0 1 2 1
+
+
+[2026-10-11T09:59:06Z >>> MODE]
+MODE
+
+TNET:G9TNT-1}  0 1800 6 3 0 30 0 0 0 900 1 31 0 0 1 0 0
+
+
+[2026-10-11T09:59:08Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+
+[2026-10-11T09:59:10Z >>> ROUTES]
+ROUTES
+
+TNET:G9TNT-1} Routes:
+
+
+[2026-10-11T09:59:42Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+
+[2026-10-11T10:00:08Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+
+[2026-10-11T10:00:34Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+XRNODE:G9XRT       
+
+
+[2026-10-11T10:01:00Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+XRNODE:G9XRT       
+
+
+[2026-10-11T10:01:26Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+XRNODE:G9XRT       
+
+
+[2026-10-11T10:01:28Z >>> ROUTES]
+ROUTES
+
+TNET:G9TNT-1} Routes:
+
+  0 XRNODE:G9XRT 192 1
+
+
+[2026-10-11T10:02:13Z >>> C XRNODE]
+C XRNODE
+
+TNET:G9TNT-1} Connected to XRNODE:G9XRT
+
+
+[2026-10-11T10:02:20Z >>> NODES]
+NODES
+
+
+
+G9XRT:XRNODE} Nodes:
+
+
+
+   TNET:G9TNT-1   
+
+
+
+1 nodes found
+
+
+[2026-10-11T10:02:27Z >>> BYE]
+BYE
+
+
+
+G9XRT:XRNODE} Goodbye
+
+
+[2026-10-11T10:02:34Z back to the TheNet node prompt]
+TNET:G9TNT-1} Welcome back.
+
+
+[2026-10-11T10:02:37Z >>> ESC]
+* 
+[2026-10-11T10:02:39Z >>> C]
+C
+
+
+[2026-10-11T10:02:41Z >>> C G9XRT-2]
+C G9XRT-2
+
+TNET:G9TNT-1} Connected to G9XRT-2
+
+[XR-505o-BFHM$]
+
+Welcome to G9XRT's PMS
+
+You have 0 new messages
+
+Please use the 'NH' command to set your 'home' BBS.
+
+
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+
+
+[2026-10-11T10:02:54Z >>> ?]
+?
+
+Help:
+
+
+
+Use  "? *" to list available commands in brief
+
+Use  "? **" for a more detailed list
+
+
+
+Use "? <cmd>" for syntax of <cmd>
+
+Wildcards are accepted, e.g.  "? I*"
+
+
+
+[0] B,H,I,J,K,KM,L,LM,LN,M,N,R,SB,SP,SR,U,? >
+
+
+[2026-10-11T10:03:02Z >>> B]
+B
+
+  - Logged off
+
+TNET:G9TNT-1} Welcome back.
+
+
+[2026-10-11T10:03:10Z back to the TheNet node prompt]
+
+[2026-10-11T10:03:12Z >>> ESC]
+* 
+[2026-10-11T10:03:14Z >>> C]
+C
+
+
+[2026-10-11T10:03:16Z >>> NODES]
+NODES
+
+TNET:G9TNT-1} Nodes:
+
+XRNODE:G9XRT       
+
+
+[2026-10-11T10:03:19Z >>> ROUTES]
+ROUTES
+
+TNET:G9TNT-1} Routes:
+
+> 0 XRNODE:G9XRT 192 1
+
+
+[2026-10-11T10:03:21Z >>> STATS]
+STATS
+
+TNET:G9TNT-1} Statistics
+
+L1 Tx % : 0 0 0 0 0 0 
+
+L1 DCD% : 0 0 0 0 0 0 
+
+L1 RxOvr: 0 0 0 0 
+
+L1 TxUnd: 0 0 0 0 
+
+L2 RxCRC: 0 0 0 0 
+
+L2 heard: 33 0 0 0 
+
+L2 recvd: 30 0 0 0 
+
+L2 sent : 33 4 0 0 
+
+L2 RxRNR: 0 0 0 0 
+
+L2 RxREJ: 0 0 0 0 
+
+L2 TxRNR: 0 0 0 0 
+
+L2 TxREJ: 0 0 0 0 
+
+L2 fails: 0 0 0 0 
+
+L3 g'wyd: 0 0 
+
+L4 recvd: 12 0 
+
+L4 sent : 9 0 
+
+Buffers : 0 0 0 0 0 0 
+
+CPU loop: 0 0 0 0 0 0 
+
+Timers  : 0 0
+
+
+[2026-10-11T10:03:24Z >>> LINKS]
+LINKS
+
+TNET:G9TNT-1} Links:
+
+G9TNT-1 G9XRT  4 0 0 
+

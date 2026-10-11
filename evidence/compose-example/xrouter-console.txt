@@ -1,0 +1,22 @@
+
+Xrouter v505o
+
+Callsign: 
+[2026-10-11T10:16:04Z >>> G9ABC]
+G9XRT XRouter, linked to a TheNet X1J node on port 1.
+Type ? for commands, C TNET to reach TheNet.
+
+[2026-10-11T10:16:05Z >>> C TNET]
+
+G9XRT:XRNODE} Trying G9TNT-1...
+
+G9XRT:XRNODE} Connected to G9TNT-1
+
+[2026-10-11T10:16:12Z >>> NODES]
+TNET:G9TNT-1} Nodes:
+XRNODE:G9XRT       
+
+[2026-10-11T10:16:19Z >>> BYE]
+TNET:G9TNT-1} Goodbye.
+
+[2026-10-11T10:16:23Z xrouter closed the connection]
