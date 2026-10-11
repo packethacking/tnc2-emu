@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test
+        run: cargo test --release --locked
+      - name: Build the Docker image
+        run: docker build -t tnc2-emu:ci .
+
+  interop:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        xrouter: [505o-amd64, 505c-amd64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Docker image
+        run: docker build -t tnc2-emu:dev .
+      - name: XRouter interop run
+        run: python3 interop/run.py --xrouter-tag ${{ matrix.xrouter }} --out interop-evidence
+      - name: Keep the evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interop-${{ matrix.xrouter }}
+          path: interop-evidence

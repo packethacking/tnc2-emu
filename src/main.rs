@@ -103,7 +103,7 @@ fn parse_args() -> Config {
         monitor: env("TNC2_MONITOR").is_some_and(|v| v != "0"),
         console_echo: false,
         capture: env("TNC2_CAPTURE"),
-        debug: false,
+        debug: env("TNC2_DEBUG").is_some_and(|v| v != "0"),
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -128,6 +128,7 @@ fn parse_args() -> Config {
             "--console-echo" => c.console_echo = true,
             "--capture" => c.capture = Some(val()),
             "--debug" => c.debug = true,
+            "--no-debug" => c.debug = false,
             _ => usage(),
         }
     }
@@ -384,7 +385,8 @@ fn main() {
 
     let mut cpu = Z80::default();
     eprintln!(
-        "tnc2-emu: clock {} Hz, speed {}, radio {} bit/s, RS232 {} bit/s, RS232 mode {}",
+        "{} tnc2-emu: power on, clock {} Hz, speed {}, radio {} bit/s, RS232 {} bit/s, RS232 mode {}",
+        utc_now(),
         clock,
         cfg.speed,
         cfg.hdlc_baud,
@@ -493,6 +495,10 @@ fn main() {
                 cpu.regs.get_pc(),
                 board.bank(),
                 tick_due
+            );
+            eprintln!(
+                "debug: txstate(8227)={} slot(8229)={} A: {}",
+                board.ram[0x227], board.ram[0x229], board.sio.a.debug_state()
             );
         }
 

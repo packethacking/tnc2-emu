@@ -45,6 +45,8 @@ pub struct Channel {
     /// (byte, is_end_of_frame).
     rx_stream: VecDeque<(u8, bool)>,
     next_rx_at: u64,
+    /// When the simulated carrier drops after the last received frame.
+    rx_dcd_off_at: Option<u64>,
     /// Whole frames waiting to be received (HDLC) or bytes (async).
     pub rx_frames: VecDeque<Vec<u8>>,
     pub rx_bytes: VecDeque<u8>,
@@ -88,6 +90,7 @@ impl Channel {
             rx_char_ip: false,
             rx_stream: VecDeque::new(),
             next_rx_at: 0,
+            rx_dcd_off_at: None,
             rx_frames: VecDeque::new(),
             rx_bytes: VecDeque::new(),
             tx_buf: None,
@@ -441,12 +444,40 @@ impl Channel {
 
     fn run_rx(&mut self, now: u64) {
         if !self.rx_enabled() {
+            if self.is_sdlc() && !self.rx_stream.is_empty() {
+                // receiver switched off part way through a frame: it is lost
+                log::debug(&format!(
+                    "SIO {}: receiver disabled mid frame, {} characters lost",
+                    self.name,
+                    self.rx_stream.len()
+                ));
+                self.rx_stream.clear();
+                self.rx_dcd_off_at = Some(now);
+            }
+            if self.rx_dcd_off_at.is_some_and(|t| now >= t) {
+                self.rx_dcd_off_at = None;
+                self.dcd = false;
+                self.check_ext();
+            }
             return;
         }
         if self.is_sdlc() {
-            // a simplex radio does not hear while it transmits
             if self.rx_stream.is_empty() {
-                if self.tx_clock_on || self.rts() {
+                let busy = self.tx_clock_on || self.rts();
+                if let Some(t) = self.rx_dcd_off_at {
+                    if now < t {
+                        return;
+                    }
+                    self.rx_dcd_off_at = None;
+                    if busy || self.rx_frames.is_empty() {
+                        // carrier drops after the closing flag
+                        self.dcd = false;
+                        self.check_ext();
+                        return;
+                    }
+                }
+                // a simplex radio does not hear while it transmits
+                if busy {
                     return;
                 }
                 if let Some(f) = self.rx_frames.pop_front() {
@@ -456,8 +487,12 @@ impl Channel {
                     // two CRC characters; the last one carries end of frame
                     self.rx_stream.push_back((0x00, false));
                     self.rx_stream.push_back((0x00, true));
-                    // opening flag time
-                    self.next_rx_at = now.max(self.next_rx_at) + self.char_cycles;
+                    // carrier detect comes up, then the opening flag
+                    if !self.dcd {
+                        self.dcd = true;
+                        self.check_ext();
+                    }
+                    self.next_rx_at = now.max(self.next_rx_at) + 2 * self.char_cycles;
                 }
                 return;
             }
@@ -480,6 +515,7 @@ impl Channel {
                     }
                     // closing flag plus a gap before the next frame
                     self.next_rx_at += 3 * self.char_cycles;
+                    self.rx_dcd_off_at = Some(self.next_rx_at);
                 } else {
                     if self.rx_int_mode() != 0 {
                         self.rx_char_ip = true;
@@ -505,12 +541,13 @@ impl Channel {
         }
     }
 
-    pub fn tx_active(&self) -> bool {
-        self.tx_clock_on
-    }
-
-    pub fn rx_busy(&self) -> bool {
-        !self.rx_stream.is_empty()
+    pub fn debug_state(&self) -> String {
+        format!(
+            "wr1={:02X} wr3={:02X} wr5={:02X} txbuf={:?} shifter={:?} clk={} ip(rs,rc,tx,ext)={},{},{},{} eom_armed={} rx_frames={} rx_stream={}",
+            self.wr[1], self.wr[3], self.wr[5], self.tx_buf, self.shifter, self.tx_clock_on,
+            self.rx_special_ip, self.rx_char_ip, self.tx_ip, self.ext_ip, self.eom_armed,
+            self.rx_frames.len(), self.rx_stream.len()
+        )
     }
 }
 
