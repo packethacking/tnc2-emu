@@ -127,4 +127,4 @@ broadcast.
   distribution archive is in `docs/`.
 - The Z80 core is the rustzx-z80 crate from the RustZX project, MIT
   licensed (`third_party/rustzx-z80-LICENSE.txt`).
-- The emulator itself is MIT licensed (`LICENSE`).
+- The emulator itself is licensed under the AGPL-3.0 (`LICENSE`, `NOTICE`).

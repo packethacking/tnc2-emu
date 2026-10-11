@@ -1,0 +1,11 @@
+tnc2-emu
+Copyright (c) 2026 Tom M0LTE and the tnc2-emu contributors
+
+The emulator source code is licensed under the GNU Affero General Public
+License, version 3 only (AGPL-3.0-only); see LICENSE.
+
+That licence covers the emulator source code only. The TheNet X1J firmware
+and documentation in rom/ and docs/ are copyright Dave Roberts G8KBB and
+others, free for amateur radio, non-commercial use with the source
+acknowledged; see rom/COPYRITE.TXT. The Z80 core (rustzx-z80, used as a
+crate) is MIT licensed; see third_party/rustzx-z80-LICENSE.txt.
