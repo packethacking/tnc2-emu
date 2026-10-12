@@ -1,0 +1,6 @@
+# Pinned so a new Rust release cannot change the firmware build or its
+# lints under us; bump it on purpose. Only applies in this directory.
+[toolchain]
+channel = "1.96.0"
+components = ["clippy", "llvm-tools"]
+targets = ["thumbv8m.main-none-eabihf"]
