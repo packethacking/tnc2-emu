@@ -266,7 +266,16 @@ impl Channel {
         self.ptr = (v & 0x07) as usize;
         match (v >> 3) & 0x07 {
             1 => {
-                // send abort
+                // Send abort: "any data being transmitted and any data in
+                // the transmit buffer is lost" (Z80 SIO manual, UM0081).
+                // If that empties a full buffer (a character waiting, or
+                // the CRC going out, when the buffer reads as full) it is
+                // a transmit buffer empty interrupt like any other. TheNet
+                // relies on it: it aborts the padding after a frame when a
+                // new frame is queued, or an underrun mid frame, sets its
+                // transmit state to 6 and starts the next frame from that
+                // interrupt (0x028A, 0x0633, 0x05C2).
+                let was_full = self.tx_buf.is_some() || matches!(self.shifter, Shifter::Crc(_));
                 if self.in_frame {
                     diag.push(Event::SendAbort { channel: self.name });
                 }
@@ -274,6 +283,9 @@ impl Channel {
                 self.frame.clear();
                 self.tx_buf = None;
                 self.shifter = Shifter::Idle;
+                if was_full && self.tx_int_enabled() {
+                    self.tx_ip = true;
+                }
             }
             2 => {
                 self.ext_ip = false;
@@ -631,5 +643,61 @@ impl Sio {
             3
         };
         (base & 0xf1) | (code << 1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Channel A set up as TheNet does (SDLC, Tx and ext interrupts), with
+    /// the transmitter on.
+    fn sdlc() -> (Channel, Diags) {
+        let mut d = Diags::new();
+        let mut c = Channel::new('A', 100);
+        for (r, v) in [(4, 0x20), (1, 0x1b), (5, 0xeb)] {
+            c.write_ctrl(r, 0, &mut d);
+            c.write_ctrl(v, 0, &mut d);
+        }
+        (c, d)
+    }
+
+    /// TheNet aborts the padding after a frame when a new one is queued
+    /// and starts that frame from the next Tx interrupt (issue 4).
+    #[test]
+    fn abort_with_a_character_waiting_interrupts() {
+        let (mut c, mut d) = sdlc();
+        c.write_data(0x00, 0);
+        c.run(100, &mut d); // into the shifter
+        c.write_ctrl(0x28, 100, &mut d); // reset Tx int pending
+        c.write_data(0x00, 100);
+        assert_eq!(c.pending(), None);
+        c.write_ctrl(0x08, 110, &mut d); // send abort
+        assert_eq!(c.pending(), Some(Src::Tx));
+        assert_eq!(c.tx_buf, None);
+    }
+
+    /// The same when the abort lands while the CRC is going out.
+    #[test]
+    fn abort_during_crc_interrupts() {
+        let (mut c, mut d) = sdlc();
+        c.write_ctrl(0x80, 0, &mut d); // reset Tx CRC
+        c.write_data(0x41, 0);
+        c.write_ctrl(0xc0, 0, &mut d); // reset EOM latch
+        c.run(100, &mut d);
+        c.write_ctrl(0x28, 100, &mut d);
+        c.run(200, &mut d); // underrun: CRC
+        assert!(matches!(c.shifter, Shifter::Crc(_)));
+        c.write_ctrl(0x28, 200, &mut d);
+        c.write_ctrl(0x08, 210, &mut d);
+        assert_eq!(c.pending(), Some(Src::Tx));
+    }
+
+    /// With the buffer already empty an abort does not interrupt.
+    #[test]
+    fn abort_with_buffer_empty_is_quiet() {
+        let (mut c, mut d) = sdlc();
+        c.write_ctrl(0x08, 0, &mut d);
+        assert_eq!(c.pending(), None);
     }
 }
