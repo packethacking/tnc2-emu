@@ -227,11 +227,21 @@ struct Bus {
     rom: [RomHalf; 2],
     ram: alloc::boxed::Box<[u8; RAM_SIZE]>,
     sio: sio::Sio,
-    cycles: u64,
-    /// `Board::run` runs instructions back to back while `cycles` is below
+    /// Clock cycles since power on are `base + now`. The Z80 counts in
+    /// `now`, which is 32 bits to be cheap on a 32 bit core; `Board::run`
+    /// moves it into `base` often enough that it never overflows.
+    base: u64,
+    now: u32,
+    /// `Board::run` runs instructions back to back while `now` is below
     /// this; an SIO port access sets it to 0 to stop it after that
     /// instruction.
-    due: u64,
+    due: u32,
+    /// `sio.int_active()`, which the Z80 asks before every instruction.
+    /// Updated wherever the SIO can change in `Board::run`: the host's
+    /// changes between calls are picked up before the first instruction.
+    int_line: bool,
+    /// `bank()`, kept up to date by SIO writes: it is read on every fetch.
+    upper: bool,
     /// Ports already reported, one bit per (direction, port).
     seen_ports: [u32; 16],
     adc_channel: u8,
@@ -239,6 +249,10 @@ struct Bus {
 }
 
 impl Bus {
+    fn cycles(&self) -> u64 {
+        self.base + self.now as u64
+    }
+
     fn bank(&self) -> usize {
         // EPROM A15 is wired to the SIO DTRA pin, which is active low:
         // WR5A bit 7 set drives the pin low and selects the lower half.
@@ -259,7 +273,7 @@ impl Z80Bus for Bus {
     fn read_internal(&mut self, addr: u16) -> u8 {
         let a = addr as usize;
         if a < ROM_HALF {
-            self.rom[self.bank()][a]
+            self.rom[self.upper as usize][a]
         } else {
             self.ram[a - ROM_HALF]
         }
@@ -271,22 +285,27 @@ impl Z80Bus for Bus {
         }
     }
     fn wait_mreq(&mut self, _addr: u16, clk: usize) {
-        self.cycles += clk as u64;
+        self.now += clk as u32;
     }
     fn wait_no_mreq(&mut self, _addr: u16, clk: usize) {
-        self.cycles += clk as u64;
+        self.now += clk as u32;
     }
     fn wait_internal(&mut self, clk: usize) {
-        self.cycles += clk as u64;
+        self.now += clk as u32;
+    }
+    fn wait_loop(&mut self, _addr: u16, clk: usize) {
+        self.now += clk as u32;
     }
     fn read_io(&mut self, port: u16) -> u8 {
         let p = port as u8;
-        self.cycles += 4;
+        self.now += 4;
         match p {
             0..=3 => {
                 self.due = 0;
-                self.sio.run(self.cycles, &mut self.diags);
-                self.sio.read(p)
+                self.sio.run(self.cycles(), &mut self.diags);
+                let v = self.sio.read(p);
+                self.int_line = self.sio.int_active();
+                v
             }
             0x20 => {
                 // ADC0844 on the optional deviation meter / S meter board.
@@ -303,12 +322,15 @@ impl Z80Bus for Bus {
     }
     fn write_io(&mut self, port: u16, data: u8) {
         let p = port as u8;
-        self.cycles += 4;
+        self.now += 4;
         match p {
             0..=3 => {
                 self.due = 0;
-                self.sio.run(self.cycles, &mut self.diags);
-                self.sio.write(p, data, self.cycles, &mut self.diags);
+                let now = self.cycles();
+                self.sio.run(now, &mut self.diags);
+                self.sio.write(p, data, now, &mut self.diags);
+                self.int_line = self.sio.int_active();
+                self.upper = self.bank() == 1;
             }
             0x20 => {
                 self.note_port(true, p, data);
@@ -323,7 +345,7 @@ impl Z80Bus for Bus {
     fn reti(&mut self) {}
     fn halt(&mut self, _halted: bool) {}
     fn int_active(&self) -> bool {
-        self.sio.int_active()
+        self.int_line
     }
     fn nmi_active(&self) -> bool {
         false
@@ -359,8 +381,11 @@ impl Board {
             rom: [lower, upper],
             ram,
             sio: sio::Sio::new(hdlc_char, async_char),
-            cycles: 0,
+            base: 0,
+            now: 0,
             due: 0,
+            int_line: false,
+            upper: true,
             seen_ports: [0; 16],
             adc_channel: 0,
             diags: Diags::new(),
@@ -413,10 +438,13 @@ impl Board {
     /// between calls.
     pub fn run(&mut self, cycles: u64) {
         let bus = &mut self.bus;
-        let end = bus.cycles + cycles;
-        while bus.cycles < end {
+        let end = bus.cycles() + cycles;
+        while bus.cycles() < end {
             // One instruction boundary in full, as it always was.
-            while bus.cycles >= self.next_tick {
+            bus.base += bus.now as u64;
+            bus.now = 0;
+            let t = bus.base;
+            while t >= self.next_tick {
                 self.next_tick += self.tick_cycles;
                 if bus.sio.b.wr[1] & 0x01 != 0 {
                     self.tick_due += 1;
@@ -427,19 +455,21 @@ impl Board {
                 bus.sio.set_ext();
                 self.tick_due -= 1;
             }
-            bus.sio.run(bus.cycles, &mut bus.diags);
-            if self.cpu.is_halted() && !bus.sio.int_active() {
-                bus.cycles += 4;
+            bus.sio.run(t, &mut bus.diags);
+            bus.int_line = bus.sio.int_active();
+            if self.cpu.is_halted() && !bus.int_line {
+                bus.now += 4;
                 continue;
             }
             self.cpu.emulate(bus);
             // Then the boundaries where all of the above would do nothing.
             // An edge waiting for the firmware to take the last one is due
-            // at once; a HALT goes back to the full step, which handles the
-            // halted CPU.
+            // at once; the cap keeps `now` far from overflowing; a HALT
+            // goes back to the full step, which handles the halted CPU.
             let tick = if self.tick_due > 0 && !bus.sio.b.ext_pending() { 0 } else { self.next_tick };
-            bus.due = end.min(tick).min(bus.sio.next_event());
-            while bus.cycles < bus.due && !self.cpu.is_halted() {
+            let due = end.min(tick).min(bus.sio.next_event());
+            bus.due = due.saturating_sub(t).min(1 << 30) as u32;
+            while bus.now < bus.due && !self.cpu.is_halted() {
                 self.cpu.emulate(bus);
             }
         }
@@ -447,7 +477,7 @@ impl Board {
 
     /// Clock cycles since power on.
     pub fn cycles(&self) -> u64 {
-        self.bus.cycles
+        self.bus.cycles()
     }
 
     pub fn clock_hz(&self) -> u64 {

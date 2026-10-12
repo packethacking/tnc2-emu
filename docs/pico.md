@@ -48,7 +48,7 @@ If a clock is too fast for the board, the chip may simply stop. A watchdog then 
 
 Please send the whole output, whatever it says.
 
-What we expect, from counting the instructions the emulator runs (no hardware has run it yet): about 29 Arm instructions per Z80 clock cycle, which comes to somewhere between 200 and 275 MHz for real time. So 150 MHz will very likely fall short, and the answer is in the overclocks.
+What we expect, from counting the instructions the emulator runs (no hardware has run it yet, see `tools/m33bench`): about 15 Arm instructions per Z80 clock cycle, which comes to somewhere between 105 and 140 MHz for real time. So 150 MHz should just about do, and the overclocks show how much room there is.
 
 ## The clocks
 
