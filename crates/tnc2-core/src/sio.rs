@@ -815,9 +815,9 @@ mod tests {
     }
 
     /// `next_event` is never late: running the channel at any cycle before
-    /// it changes nothing. Random register writes, data, reads, received
-    /// frames and bytes and carrier changes, in both modes, checked before
-    /// every step.
+    /// it changes nothing. Random register writes (mode switches too),
+    /// data, reads, received frames and bytes and carrier changes, starting
+    /// in each mode, checked before every step.
     #[test]
     fn next_event_is_never_late() {
         for sdlc_mode in [true, false] {
@@ -841,6 +841,9 @@ mod tests {
                 (5, 0xe9),
                 (5, 0xe3),
                 (5, 0xe1),
+                // switch between SDLC and async mid stream
+                (4, 0x20),
+                (4, 0x44),
             ];
             let cmds = [0x08, 0x10, 0x28, 0x30, 0x80, 0xc0];
             let mut rng: u64 = 0x9e3779b97f4a7c15;
