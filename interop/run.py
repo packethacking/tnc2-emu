@@ -112,6 +112,7 @@ class Console:
         self.sock.settimeout(0.2)
         self.buf = ""
         self.closed = False
+        self.last_rx = 0.0
 
     def _pump(self) -> bool:
         try:
@@ -148,6 +149,11 @@ class Console:
             i += 1
         text = out.decode("latin-1").replace("\r\n", "\n").replace("\r", "\n")
         self.buf += text
+        # Stamp output that comes after a pause, so the transcript shows
+        # when the node answered and not just when we asked.
+        if time.time() - self.last_rx > 1.0:
+            self.log.write(f"[{now()} <<<]" + ("" if text.startswith("\n") else "\n"))
+        self.last_rx = time.time()
         self.log.write(text)
         self.log.flush()
         return True
@@ -192,7 +198,10 @@ class Console:
 
 
 def now():
-    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Same form as the emulator's log and frame capture, so a transcript
+    # can be lined up against the wire to the millisecond.
+    t = datetime.datetime.now(datetime.timezone.utc)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.") + f"{t.microsecond // 1000:03d}Z"
 
 
 def main():
