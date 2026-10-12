@@ -97,6 +97,13 @@ Transmit (handler 0x05C2, state byte in RAM 0x8227):
   they are not part of any frame.
 - An underrun while still in the data state (ext/status interrupt with RR0A
   bit 6) makes the firmware send an abort.
+- If a new frame is queued while the padding bytes are going out (state 8
+  to 10), 0x028A sets the state back to 6 and sends an abort. Both aborts
+  leave the firmware waiting in state 6 for a Tx buffer empty interrupt to
+  start the next frame. The SIO gives one: an abort throws away the
+  character in the transmit buffer (or the CRC being sent), and the buffer
+  becoming empty interrupts as usual. Without that interrupt the node stays
+  keyed up in state 6 and never transmits again (issue 4).
 
 The emulator treats every byte written between "reset Tx CRC" and the
 underrun as the frame, and sends it out as one KISS frame.
