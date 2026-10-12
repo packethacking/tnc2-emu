@@ -10,7 +10,7 @@ use std::fs;
 use std::io::Write;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tnc2_core::rom::{self, RamImageError, RomHalf};
-use tnc2_core::{Board, BoardConfig, NodeConfig, Poke, ax25, kiss};
+use tnc2_core::{Board, BoardConfig, CONSOLE_RX_QUEUE, NodeConfig, Poke, ax25, kiss};
 
 struct Config {
     rom1: String,
@@ -228,7 +228,10 @@ fn main() {
             rs232_dcd: !cfg.protocol_mode,
         },
     )
-    .unwrap_or_else(|_| usage());
+    .unwrap_or_else(|e| {
+        eprintln!("error: {e}");
+        usage()
+    });
     let fingerprint = board.fingerprint();
 
     if let (Some(path), false) = (&cfg.ram_file, cfg.cold) {
@@ -306,7 +309,9 @@ fn main() {
             if let Some(cap) = capture.as_mut() {
                 let _ = writeln!(cap, "{} RX {}", utc_now(), hex(f));
             }
-            board.push_radio_frame(f);
+            // A full queue drops the frame, as a busy TNC would; the
+            // core reports it as an event.
+            let _ = board.push_radio_frame(f);
         }
 
         // RS232 side
@@ -329,8 +334,11 @@ fn main() {
             }
             console.send_all(out);
         }
-        for data in console.poll() {
-            board.push_console(&data);
+        // Read no more than the core can queue; the rest waits in TCP.
+        let room = CONSOLE_RX_QUEUE - board.console_rx_pending();
+        for data in console.poll(room) {
+            let taken = board.push_console(&data);
+            debug_assert_eq!(taken, data.len());
         }
 
         if let Some(path) = &cfg.ram_file {

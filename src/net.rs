@@ -25,10 +25,12 @@ impl Server {
         Ok(Server { name, listener, clients: Vec::new() })
     }
 
-    /// Accept new clients and read what is available, client by client.
-    pub fn poll(&mut self) -> Vec<Vec<u8>> {
+    /// Accept new clients and read what is available, client by client,
+    /// but no more than `budget` bytes in all. Anything past that stays in
+    /// the socket, so TCP flow control holds the sender back.
+    pub fn poll(&mut self, budget: usize) -> Vec<Vec<u8>> {
         let mut got = Vec::new();
-        self.poll_with(|_, data| got.push(data.to_vec()));
+        self.poll_with(budget, |_, data| got.push(data.to_vec()));
         got
     }
 
@@ -37,7 +39,7 @@ impl Server {
     /// removed). A client's last bytes are decoded even if it then closed.
     pub fn poll_kiss(&mut self) -> Vec<Vec<u8>> {
         let mut frames = Vec::new();
-        self.poll_with(|c, data| {
+        self.poll_with(usize::MAX, |c, data| {
             for &b in data {
                 if let Some(f) = c.kiss.push(b) {
                     frames.push(f.to_vec());
@@ -49,7 +51,7 @@ impl Server {
 
     /// Accept, read and write. `on_data` sees each chunk read while its
     /// client still exists; clients that went away are removed afterwards.
-    fn poll_with(&mut self, mut on_data: impl FnMut(&mut Client, &[u8])) {
+    fn poll_with(&mut self, mut budget: usize, mut on_data: impl FnMut(&mut Client, &[u8])) {
         loop {
             match self.listener.accept() {
                 Ok((s, a)) => {
@@ -73,13 +75,17 @@ impl Server {
         let mut dead = Vec::new();
         for (i, c) in self.clients.iter_mut().enumerate() {
             let mut buf = [0u8; 4096];
-            loop {
-                match c.stream.read(&mut buf) {
+            while budget > 0 {
+                let want = budget.min(buf.len());
+                match c.stream.read(&mut buf[..want]) {
                     Ok(0) => {
                         dead.push(i);
                         break;
                     }
-                    Ok(n) => on_data(c, &buf[..n]),
+                    Ok(n) => {
+                        budget -= n;
+                        on_data(c, &buf[..n]);
+                    }
                     Err(e) if e.kind() == ErrorKind::WouldBlock => break,
                     Err(e) if e.kind() == ErrorKind::Interrupted => continue,
                     Err(_) => {
@@ -129,6 +135,36 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         panic!("timed out");
+    }
+
+    /// Reads stop at the budget and the rest waits in the socket.
+    #[test]
+    fn poll_respects_budget() {
+        let mut srv = Server::bind("console", "127.0.0.1:0").unwrap();
+        let addr = srv.listener.local_addr().unwrap();
+        let mut c = TcpStream::connect(addr).unwrap();
+        for _ in 0..100 {
+            srv.poll(0);
+            if srv.clients.len() == 1 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let data: Vec<u8> = (0..30000u32).map(|i| i as u8).collect();
+        c.write_all(&data).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        let first: Vec<u8> = srv.poll(1000).concat();
+        assert_eq!(first.len(), 1000);
+        assert!(srv.poll(0).is_empty());
+        let mut got = first;
+        for _ in 0..100 {
+            got.extend(srv.poll(4096).concat());
+            if got.len() >= data.len() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_eq!(got, data);
     }
 
     /// One client sends a whole frame and closes while another is part
