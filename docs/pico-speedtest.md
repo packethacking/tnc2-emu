@@ -6,7 +6,7 @@ It is a separate firmware, `tnc2-pico-speedtest.uf2`, with the same two USB seri
 
 ## Running the speed test
 
-1. Get `tnc2-pico-speedtest.uf2`: open the latest run of the `ci` workflow on GitHub (Actions tab) and download the `tnc2-pico-speedtest` artifact, or build it yourself ([pico.md](pico.md#building)).
+1. Get the speed test: `tnc2-emu-<version>-pico2w-speedtest.uf2` from the latest [release](https://github.com/packethacking/tnc2-emu/releases), or for the newest code the `tnc2-pico-speedtest` artifact of the latest run of the `ci` workflow (Actions tab), or build it yourself ([pico.md](pico.md#building)).
 2. Hold the BOOTSEL button on the Pico 2 W while plugging it in. A drive called `RP2350` appears.
 3. Copy the UF2 onto that drive. The Pico restarts by itself and the drive goes away. (Or, with [picotool](https://github.com/raspberrypi/picotool): `picotool load -x tnc2-pico-speedtest.uf2`.)
 4. Open the second serial port with any terminal, for example `screen -L /dev/ttyACM1` (leave with Ctrl-A, K, y), `picocom --logfile speedtest.log /dev/ttyACM1`, or PuTTY on Windows. Logging to a file, as those two do, is worth it: if the board restarts, the terminal loses the port and you will want what it printed.
