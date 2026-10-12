@@ -4,7 +4,7 @@
 
 use crate::manager::{self, CHANGES, Change, REPLIES, Reply};
 use crate::radio::{RX, TX_TOO_LONG};
-use crate::{COUNTERS, RATES, SYS_CLOCK};
+use crate::{CLOCK_FELL_BACK, COUNTERS, RATES, SYS_CLOCK};
 use alloc::string::String;
 use core::fmt::Write;
 use core::sync::atomic::Ordering::Relaxed;
@@ -193,7 +193,8 @@ fn status(out: &mut String, rom: Defaults, reset: &'static str) -> core::fmt::Re
         last_save: info.last_save.map(|(g, at)| (g, (now - at).as_secs())),
         save_failures: info.failures,
         next_save_s: info.next_save.saturating_duration_since(now).as_secs(),
-        clock_mhz: SYS_CLOCK.mhz,
+        clock_mhz: clock::current().mhz,
+        clock_failed_mhz: CLOCK_FELL_BACK.load(Relaxed).then_some(SYS_CLOCK.mhz),
         counted_khz: clock::measure_sys_khz(),
         core_mv: clock::core_mv(),
         reset,
