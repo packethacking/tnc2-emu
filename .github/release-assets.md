@@ -12,4 +12,6 @@
 
 The Linux binaries are static, so there is nothing else to install. Unpack one and run `./tnc2-emu` in its folder: it finds the TheNet EPROM images in `rom/` there, and takes the flags in the README's [settings](https://github.com/packethacking/tnc2-emu/blob/v{version}/README.md#settings) table.
 
-For the Pico, hold BOOTSEL while plugging it in and copy the UF2 onto the drive that appears. Flashing a new version keeps the node's saved RAM and settings.
+For the Pico, hold BOOTSEL while plugging it in and copy the UF2 onto the drive that appears. Flashing a new version normally keeps the node's saved RAM and settings.
+
+**Licences.** The emulator is AGPL-3.0. TheNet X1J is copyright Dave Roberts G8KBB (based on TheNet 1.01 by NORD><LINK, DF2AU and DC4OX), free for amateur, non-commercial use with the source acknowledged (`rom/COPYRITE.TXT`). The Z80 core, rustzx-z80, is MIT. The UF2s contain all three; the full texts are in each Linux archive and in the source.

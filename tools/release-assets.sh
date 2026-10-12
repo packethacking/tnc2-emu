@@ -29,7 +29,8 @@ mkdir -p "$out"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# Archive timestamps from the commit, so a rebuild makes the same files.
+# Fixed owners, modes and times (the commit's), so an archive changes
+# only when what is in it does.
 mtime=$(git log -1 --format=%ct)
 
 for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabihf; do
@@ -48,7 +49,7 @@ for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown
 	cp LICENSE NOTICE README.md "$dir/"
 	cp third_party/rustzx-z80-LICENSE.txt "$dir/third_party/"
 	file "$dir/tnc2-emu"
-	tar -C "$tmp" --sort=name --owner=0 --group=0 --numeric-owner --mtime="@$mtime" -cf - "$name" | gzip -9n > "$out/$name.tar.gz"
+	tar -C "$tmp" --sort=name --owner=0 --group=0 --numeric-owner --mode=go-w --mtime="@$mtime" -cf - "$name" | gzip -9n > "$out/$name.tar.gz"
 done
 
 echo "== Building the Pico 2 W firmware"

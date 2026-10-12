@@ -27,7 +27,7 @@ The Pico sends two stop bits and the TNC one. That is on purpose: the NinoTNC ga
 
 1. Get the node firmware: `tnc2-emu-<version>-pico2w-node.uf2` from the latest [release](https://github.com/packethacking/tnc2-emu/releases), or for the newest code the `tnc2-pico-node` artifact of the latest run of the `ci` workflow (Actions tab), or build it yourself (below).
 2. Hold the BOOTSEL button on the Pico 2 W while plugging it in. A drive called `RP2350` appears.
-3. Copy the UF2 onto that drive. The Pico restarts by itself and the drive goes away. (Or, with [picotool](https://github.com/raspberrypi/picotool): `picotool load -x tnc2-pico-node.uf2`.)
+3. Copy the UF2 onto that drive. The Pico restarts by itself and the drive goes away. (Or, with [picotool](https://github.com/raspberrypi/picotool): `picotool load -x tnc2-emu-<version>-pico2w-node.uf2`, or the name of the file you built.)
 
 Flashing a new version keeps the saved RAM and settings: they live in a part of the flash the firmware never touches.
 
