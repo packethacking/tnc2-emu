@@ -38,8 +38,25 @@ jobs:
         run: |
           cargo clippy --release --locked -- -D warnings
           cargo build --release --locked
+      - name: Check the emulator's hot code is linked into SRAM
+        working-directory: crates/tnc2-pico
+        run: |
+          nm="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-nm"
+          "$nm" -C target/thumbv8m.main-none-eabihf/release/speedtest > symbols.txt
+          for f in speedtest::run_batch tnc2_core::sio::Channel::run \
+                   rustzx_z80::opcode::group_nonprefixed::execute_normal; do
+            line=$(grep -E " [tT] $f::h[0-9a-f]+$" symbols.txt)
+            echo "$line"
+            case "$line" in 2000*) ;; *) echo "$f is not in SRAM"; exit 1 ;; esac
+          done
+      - name: Check the firmware expects the RAM hash the host gets
+        run: |
+          want=$(grep -oP 'const HOST_HASH: u64 = 0x\K[0-9a-f]+' crates/tnc2-pico/src/bin/speedtest.rs)
+          cargo run --release --locked -p tnc2-core --example bench -- 60 | tee bench.txt
+          grep -q "RAM hash $want)" bench.txt || { echo "host hash is not $want"; exit 1; }
       - name: Make the UF2
         run: |
+          sudo apt-get update -q
           sudo apt-get install -y -q libusb-1.0-0
           curl -sSLo picotool.tar.gz https://github.com/raspberrypi/pico-sdk-tools/releases/download/v2.3.1-0/picotool-2.3.1-x86_64-lin.tar.gz
           echo "878a1a1e7d8336b8be60300c7218f366d9790c0d3a211b181d6d172e80b1248e  picotool.tar.gz" | sha256sum -c
