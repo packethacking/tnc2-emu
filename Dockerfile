@@ -16,7 +16,8 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=aarch64-linux-gnu-gcc \
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build --release --locked --target "$(cat /rust-target)" \
+COPY crates ./crates
+RUN cargo build --release --locked --target "$(cat /rust-target)" -p tnc2-emu \
  && cp "target/$(cat /rust-target)/release/tnc2-emu" /tnc2-emu
 
 # Runtime stage: just the binary and the EPROM images

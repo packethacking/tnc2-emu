@@ -168,6 +168,12 @@ How the hardware was worked out, port by port, is in `docs/hardware.md`.
 `cargo test` boots the firmware and checks the console and the first NODES
 broadcast.
 
+The repo is a Cargo workspace. The board itself (Z80, SIO, EPROM, RAM, KISS framing) lives in `crates/tnc2-core`, a `no_std` library with no I/O of its own, ready for a microcontroller port. The `tnc2-emu` binary is the TCP host around it. To see how fast your machine runs the board flat out:
+
+```sh
+cargo run --release -p tnc2-core --example bench
+```
+
 ## Credits and licences
 
 - TheNet X1J by Dave Roberts G8KBB, based on TheNet 1.01 by NORD><LINK

@@ -8,7 +8,10 @@
 //!
 //! See docs/hardware.md for how TheNet X1J drives this chip.
 
-use std::collections::VecDeque;
+use crate::{Diags, Event};
+use alloc::collections::VecDeque;
+use alloc::vec::Vec;
+use core::fmt;
 
 /// Interrupt sources, in daisy-chain priority order (highest first).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,8 +33,8 @@ enum Shifter {
 }
 
 pub struct Channel {
-    pub name: char,
-    pub wr: [u8; 8],
+    pub(crate) name: char,
+    pub(crate) wr: [u8; 8],
     ptr: usize,
 
     // Receive side
@@ -48,8 +51,8 @@ pub struct Channel {
     /// When the simulated carrier drops after the last received frame.
     rx_dcd_off_at: Option<u64>,
     /// Whole frames waiting to be received (HDLC) or bytes (async).
-    pub rx_frames: VecDeque<Vec<u8>>,
-    pub rx_bytes: VecDeque<u8>,
+    pub(crate) rx_frames: VecDeque<Vec<u8>>,
+    pub(crate) rx_bytes: VecDeque<u8>,
 
     // Transmit side
     tx_buf: Option<u8>,
@@ -62,19 +65,19 @@ pub struct Channel {
     in_frame: bool,
     frame: Vec<u8>,
     /// Completed transmit frames (HDLC) waiting for the host.
-    pub tx_frames: VecDeque<Vec<u8>>,
+    pub(crate) tx_frames: VecDeque<Vec<u8>>,
     /// Transmitted async bytes waiting for the host.
-    pub tx_bytes: Vec<u8>,
+    pub(crate) tx_bytes: VecDeque<u8>,
 
     // External / status
-    pub dcd: bool,
-    pub cts: bool,
-    pub sync: bool,
+    pub(crate) dcd: bool,
+    pub(crate) cts: bool,
+    pub(crate) sync: bool,
     ext_ip: bool,
     last_rr0_ext: u8,
 
     /// Character time in CPU cycles.
-    pub char_cycles: u64,
+    pub(crate) char_cycles: u64,
 }
 
 impl Channel {
@@ -102,7 +105,7 @@ impl Channel {
             in_frame: false,
             frame: Vec::new(),
             tx_frames: VecDeque::new(),
-            tx_bytes: Vec::new(),
+            tx_bytes: VecDeque::new(),
             dcd: false,
             cts: false,
             sync: false,
@@ -245,14 +248,14 @@ impl Channel {
         self.ext_ip
     }
 
-    fn write_ctrl(&mut self, v: u8, now: u64) {
+    fn write_ctrl(&mut self, v: u8, now: u64, diag: &mut Diags) {
         let reg = self.ptr;
         self.ptr = 0;
         if reg != 0 {
             let old = self.wr[reg];
             self.wr[reg] = v;
             if reg == 5 {
-                self.wr5_changed(old, now);
+                self.wr5_changed(old, now, diag);
             }
             if reg == 1 {
                 self.last_rr0_ext = self.ext_bits();
@@ -265,7 +268,7 @@ impl Channel {
             1 => {
                 // send abort
                 if self.in_frame {
-                    log::debug(&format!("SIO {}: send abort, frame dropped", self.name));
+                    diag.push(Event::SendAbort { channel: self.name });
                 }
                 self.in_frame = false;
                 self.frame.clear();
@@ -305,7 +308,7 @@ impl Channel {
         }
     }
 
-    fn wr5_changed(&mut self, old: u8, now: u64) {
+    fn wr5_changed(&mut self, old: u8, now: u64, diag: &mut Diags) {
         let was = old & 0x08 != 0;
         let is = self.tx_enabled();
         if is && !was {
@@ -316,11 +319,7 @@ impl Channel {
             self.tx_clock_on = false;
             self.shifter = Shifter::Idle;
             if self.in_frame && !self.frame.is_empty() {
-                log::debug(&format!(
-                    "SIO {}: transmitter disabled mid frame, {} bytes dropped",
-                    self.name,
-                    self.frame.len()
-                ));
+                diag.push(Event::TxDisabledMidFrame { channel: self.name, bytes: self.frame.len() });
             }
             self.in_frame = false;
             self.frame.clear();
@@ -342,7 +341,7 @@ impl Channel {
     }
 
     fn shift_out_async(&mut self, v: u8, now: u64) {
-        self.tx_bytes.push(v);
+        self.tx_bytes.push_back(v);
         self.shifter = Shifter::Data;
         self.next_tx_at = now + self.char_cycles;
         self.tx_clock_on = true;
@@ -368,12 +367,12 @@ impl Channel {
     }
 
     /// Advance the channel to cycle `now`.
-    fn run(&mut self, now: u64) {
-        self.run_tx(now);
-        self.run_rx(now);
+    fn run(&mut self, now: u64, diag: &mut Diags) {
+        self.run_tx(now, diag);
+        self.run_rx(now, diag);
     }
 
-    fn run_tx(&mut self, now: u64) {
+    fn run_tx(&mut self, now: u64, diag: &mut Diags) {
         if !self.is_sdlc() {
             // async transmitter
             while self.tx_clock_on && now >= self.next_tx_at {
@@ -403,7 +402,7 @@ impl Channel {
                         // underrun
                         if self.eom_armed {
                             if self.in_frame {
-                                let f = std::mem::take(&mut self.frame);
+                                let f = core::mem::take(&mut self.frame);
                                 self.tx_frames.push_back(f);
                             }
                             self.in_frame = false;
@@ -413,11 +412,7 @@ impl Channel {
                         } else {
                             // latch already set: idle with flags
                             if self.in_frame && !self.frame.is_empty() {
-                                log::debug(&format!(
-                                    "SIO {}: underrun with EOM latch set, {} bytes dropped",
-                                    self.name,
-                                    self.frame.len()
-                                ));
+                                diag.push(Event::UnderrunWithEom { channel: self.name, bytes: self.frame.len() });
                             }
                             self.in_frame = false;
                             self.frame.clear();
@@ -442,15 +437,11 @@ impl Channel {
         }
     }
 
-    fn run_rx(&mut self, now: u64) {
+    fn run_rx(&mut self, now: u64, diag: &mut Diags) {
         if !self.rx_enabled() {
             if self.is_sdlc() && !self.rx_stream.is_empty() {
                 // receiver switched off part way through a frame: it is lost
-                log::debug(&format!(
-                    "SIO {}: receiver disabled mid frame, {} characters lost",
-                    self.name,
-                    self.rx_stream.len()
-                ));
+                diag.push(Event::RxDisabledMidFrame { channel: self.name, chars: self.rx_stream.len() });
                 self.rx_stream.clear();
                 self.rx_dcd_off_at = Some(now);
             }
@@ -541,12 +532,23 @@ impl Channel {
         }
     }
 
-    pub fn debug_state(&self) -> String {
-        format!(
+    pub fn debug_state(&self) -> DebugState<'_> {
+        DebugState(self)
+    }
+}
+
+/// One line of channel state for --debug.
+pub struct DebugState<'a>(&'a Channel);
+
+impl fmt::Display for DebugState<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let c = self.0;
+        write!(
+            f,
             "wr1={:02X} wr3={:02X} wr5={:02X} txbuf={:?} shifter={:?} clk={} ip(rs,rc,tx,ext)={},{},{},{} eom_armed={} rx_frames={} rx_stream={}",
-            self.wr[1], self.wr[3], self.wr[5], self.tx_buf, self.shifter, self.tx_clock_on,
-            self.rx_special_ip, self.rx_char_ip, self.tx_ip, self.ext_ip, self.eom_armed,
-            self.rx_frames.len(), self.rx_stream.len()
+            c.wr[1], c.wr[3], c.wr[5], c.tx_buf, c.shifter, c.tx_clock_on,
+            c.rx_special_ip, c.rx_char_ip, c.tx_ip, c.ext_ip, c.eom_armed,
+            c.rx_frames.len(), c.rx_stream.len()
         )
     }
 }
@@ -566,10 +568,10 @@ impl Sio {
 
     /// Port offset: bit 0 selects control (1) or data (0), bit 1 selects
     /// channel B (1) or A (0). This matches TheNet's use of ports 0 to 3.
-    pub fn write(&mut self, port: u8, v: u8, now: u64) {
+    pub fn write(&mut self, port: u8, v: u8, now: u64, diag: &mut Diags) {
         let ch = if port & 2 != 0 { &mut self.b } else { &mut self.a };
         if port & 1 != 0 {
-            ch.write_ctrl(v, now);
+            ch.write_ctrl(v, now, diag);
         } else {
             ch.write_data(v, now);
         }
@@ -590,9 +592,9 @@ impl Sio {
         }
     }
 
-    pub fn run(&mut self, now: u64) {
-        self.a.run(now);
-        self.b.run(now);
+    pub fn run(&mut self, now: u64, diag: &mut Diags) {
+        self.a.run(now, diag);
+        self.b.run(now, diag);
     }
 
     pub fn set_ext(&mut self) {
@@ -629,15 +631,5 @@ impl Sio {
             3
         };
         (base & 0xf1) | (code << 1)
-    }
-}
-
-pub mod log {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    pub static DEBUG: AtomicBool = AtomicBool::new(false);
-    pub fn debug(s: &str) {
-        if DEBUG.load(Ordering::Relaxed) {
-            eprintln!("debug: {s}");
-        }
     }
 }
