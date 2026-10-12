@@ -28,3 +28,10 @@ dependencies = [
  "libc",
  "tnc2-core",
 ]
+
+[[package]]
+name = "tnc2-node"
+version = "0.1.0"
+dependencies = [
+ "tnc2-core",
+]

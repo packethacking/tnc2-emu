@@ -1,0 +1,10 @@
+[package]
+name = "tnc2-node"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/packethacking/tnc2-emu"
+description = "The hardware free half of the Pico 2 W node firmware: setup commands, the flash store, KISS to the NinoTNC, the queues between the cores"
+
+[dependencies]
+tnc2-core = { path = "../tnc2-core" }

@@ -1,6 +1,6 @@
 [workspace]
-members = ["crates/tnc2-core"]
-default-members = [".", "crates/tnc2-core"]
+members = ["crates/tnc2-core", "crates/tnc2-node"]
+default-members = [".", "crates/tnc2-core", "crates/tnc2-node"]
 # The Pico firmware has its own toolchain, target and lock file, and keeps
 # its Embassy dependencies out of host builds (crates/tnc2-pico/Cargo.toml).
 exclude = ["crates/tnc2-pico", "tools/m33bench"]
