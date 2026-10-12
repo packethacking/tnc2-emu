@@ -20,6 +20,8 @@ extern crate alloc;
 
 pub mod ax25;
 pub mod bench;
+#[cfg(test)]
+mod differential;
 pub mod kiss;
 pub mod rom;
 mod sio;
@@ -233,14 +235,15 @@ struct Bus {
     base: u64,
     now: u32,
     /// `Board::run` runs instructions back to back while `now` is below
-    /// this; an SIO port access sets it to 0 to stop it after that
-    /// instruction.
+    /// this. Every SIO access sets it to 0 (`sio_accessed`).
     due: u32,
     /// `sio.int_active()`, which the Z80 asks before every instruction.
-    /// Updated wherever the SIO can change in `Board::run`: the host's
-    /// changes between calls are picked up before the first instruction.
+    /// Refreshed at every full step and after every SIO access
+    /// (`sio_accessed`): an access in the instruction of a full step is
+    /// followed by instructions run back to back, which must see it.
     int_line: bool,
-    /// `bank()`, kept up to date by SIO writes: it is read on every fetch.
+    /// `bank()`, which is read on every fetch. Refreshed after every SIO
+    /// access (`sio_accessed`).
     upper: bool,
     /// Ports already reported, one bit per (direction, port).
     seen_ports: [u32; 16],
@@ -251,6 +254,15 @@ struct Bus {
 impl Bus {
     fn cycles(&self) -> u64 {
         self.base + self.now as u64
+    }
+
+    /// After any Z80 access to the SIO: end the run of instructions back
+    /// to back and refresh what is cached from the SIO. Every SIO access
+    /// path must call this.
+    fn sio_accessed(&mut self) {
+        self.due = 0;
+        self.int_line = self.sio.int_active();
+        self.upper = self.bank() == 1;
     }
 
     fn bank(&self) -> usize {
@@ -301,10 +313,9 @@ impl Z80Bus for Bus {
         self.now += 4;
         match p {
             0..=3 => {
-                self.due = 0;
                 self.sio.run(self.cycles(), &mut self.diags);
                 let v = self.sio.read(p);
-                self.int_line = self.sio.int_active();
+                self.sio_accessed();
                 v
             }
             0x20 => {
@@ -325,12 +336,10 @@ impl Z80Bus for Bus {
         self.now += 4;
         match p {
             0..=3 => {
-                self.due = 0;
                 let now = self.cycles();
                 self.sio.run(now, &mut self.diags);
                 self.sio.write(p, data, now, &mut self.diags);
-                self.int_line = self.sio.int_active();
-                self.upper = self.bank() == 1;
+                self.sio_accessed();
             }
             0x20 => {
                 self.note_port(true, p, data);
@@ -429,43 +438,24 @@ impl Board {
     ///
     /// Every instruction boundary is as if the time base and the SIO were
     /// brought up to date just before it, which is when the Z80 sees the
-    /// interrupt line. Most of the time they have nothing to do, so after
-    /// each instruction this works out the first cycle at which they could
+    /// interrupt line (`full_step`, which `run_reference` does before every
+    /// instruction). Most of the time they have nothing to do, so after
+    /// each full step this works out the first cycle at which they could
     /// (the next 600 Hz edge, or the next SIO character, tick or carrier
     /// change) and runs instructions back to back until then. Only the Z80
-    /// touching the SIO can bring that sooner, and an SIO port access ends
-    /// the run of instructions (`Bus::due`). The host changes the SIO only
-    /// between calls.
+    /// touching the SIO can bring that sooner: every SIO access ends the
+    /// run of instructions and refreshes the interrupt line and the bank
+    /// (`Bus::sio_accessed`). The host changes the SIO only between calls,
+    /// and every call starts with a full step.
     pub fn run(&mut self, cycles: u64) {
-        let bus = &mut self.bus;
-        let end = bus.cycles() + cycles;
-        while bus.cycles() < end {
-            // One instruction boundary in full, as it always was.
-            bus.base += bus.now as u64;
-            bus.now = 0;
-            let t = bus.base;
-            while t >= self.next_tick {
-                self.next_tick += self.tick_cycles;
-                if bus.sio.b.wr[1] & 0x01 != 0 {
-                    self.tick_due += 1;
-                }
-            }
-            if self.tick_due > 0 && !bus.sio.b.ext_pending() {
-                bus.sio.b.sync = !bus.sio.b.sync;
-                bus.sio.set_ext();
-                self.tick_due -= 1;
-            }
-            bus.sio.run(t, &mut bus.diags);
-            bus.int_line = bus.sio.int_active();
-            if self.cpu.is_halted() && !bus.int_line {
-                bus.now += 4;
-                continue;
-            }
-            self.cpu.emulate(bus);
-            // Then the boundaries where all of the above would do nothing.
-            // An edge waiting for the firmware to take the last one is due
-            // at once; the cap keeps `now` far from overflowing; a HALT
-            // goes back to the full step, which handles the halted CPU.
+        let end = self.bus.cycles() + cycles;
+        while self.bus.cycles() < end {
+            let t = self.full_step();
+            // Then the boundaries where a full step would do nothing. An
+            // edge waiting for the firmware to take the last one is due at
+            // once; the cap keeps `now` far from overflowing; a HALT goes
+            // back to the full step, which handles the halted CPU.
+            let bus = &mut self.bus;
             let tick = if self.tick_due > 0 && !bus.sio.b.ext_pending() { 0 } else { self.next_tick };
             let due = end.min(tick).min(bus.sio.next_event());
             bus.due = due.saturating_sub(t).min(1 << 30) as u32;
@@ -473,6 +463,46 @@ impl Board {
                 self.cpu.emulate(bus);
             }
         }
+    }
+
+    /// `run` as it was, with a full step before every instruction: what
+    /// `run` must stay identical to.
+    #[cfg(test)]
+    fn run_reference(&mut self, cycles: u64) {
+        let end = self.bus.cycles() + cycles;
+        while self.bus.cycles() < end {
+            self.full_step();
+        }
+    }
+
+    /// One instruction boundary in full: bring the time base and the SIO
+    /// up to the current cycle, then one instruction (or one halted
+    /// machine cycle). Returns the cycle it started at.
+    #[inline(always)]
+    fn full_step(&mut self) -> u64 {
+        let bus = &mut self.bus;
+        bus.base += bus.now as u64;
+        bus.now = 0;
+        let t = bus.base;
+        while t >= self.next_tick {
+            self.next_tick += self.tick_cycles;
+            if bus.sio.b.wr[1] & 0x01 != 0 {
+                self.tick_due += 1;
+            }
+        }
+        if self.tick_due > 0 && !bus.sio.b.ext_pending() {
+            bus.sio.b.sync = !bus.sio.b.sync;
+            bus.sio.set_ext();
+            self.tick_due -= 1;
+        }
+        bus.sio.run(t, &mut bus.diags);
+        bus.int_line = bus.sio.int_active();
+        if self.cpu.is_halted() && !bus.int_line {
+            bus.now += 4;
+        } else {
+            self.cpu.emulate(bus);
+        }
+        t
     }
 
     /// Clock cycles since power on.
