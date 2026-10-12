@@ -1,0 +1,13 @@
+# The Pico 2 W's RP2350 runs its Arm cores (Cortex-M33, with FPU) here.
+[build]
+target = "thumbv8m.main-none-eabihf"
+
+[target.thumbv8m.main-none-eabihf]
+# With a debug probe, `cargo run --release` flashes and resets. Without one,
+# make a UF2 and drag it onto the board (docs/pico.md).
+runner = "probe-rs run --chip RP235x"
+rustflags = [
+  "-C", "link-arg=--nmagic",
+  "-C", "link-arg=-Tlink.x",
+  "-C", "target-cpu=cortex-m33",
+]

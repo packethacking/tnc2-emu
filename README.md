@@ -174,6 +174,8 @@ The repo is a Cargo workspace. The board itself (Z80, SIO, EPROM, RAM, KISS fram
 cargo run --release -p tnc2-core --example bench
 ```
 
+Getting it onto a Raspberry Pi Pico 2 W is under way: see `docs/pico.md`.
+
 ## Credits and licences
 
 - TheNet X1J by Dave Roberts G8KBB, based on TheNet 1.01 by NORD><LINK

@@ -1,0 +1,55 @@
+# The Raspberry Pi Pico 2 W (RP2350) firmware.
+#
+# Not a member of the repo's workspace, on purpose: Cargo resolves every
+# member's dependencies up front, so a member would drag the whole Embassy
+# tree into every host build and test. Build it from this directory, where
+# rust-toolchain.toml and .cargo/config.toml pick the toolchain and target:
+#
+#     cd crates/tnc2-pico && cargo build --release
+#
+# docs/pico.md has the rest, including making the UF2.
+
+[package]
+name = "tnc2-pico"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/packethacking/tnc2-emu"
+description = "TheNet X1J on a Raspberry Pi Pico 2 W, by way of tnc2-core"
+publish = false
+
+[lib]
+test = false
+bench = false
+
+[[bin]]
+name = "speedtest"
+test = false
+bench = false
+
+[dependencies]
+tnc2-core = { path = "../tnc2-core" }
+
+embassy-rp = { version = "=0.10.0", features = ["rp235xa", "time-driver", "critical-section-impl", "unstable-pac", "binary-info", "executor-thread"] }
+embassy-executor = "=0.10.0"
+embassy-time = "=0.5.1"
+embassy-sync = "=0.8.0"
+embassy-futures = "=0.1.2"
+embassy-usb = "=0.6.0"
+
+cortex-m = { version = "=0.7.9", features = ["inline-asm"] }
+cortex-m-rt = "=0.7.7"
+embedded-alloc = { version = "=0.7.0", default-features = false, features = ["llff"] }
+panic-halt = "=1.0.0"
+static_cell = "=2.1.1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = 2
+panic = "abort"
+
+[profile.dev]
+opt-level = "s"
+panic = "abort"

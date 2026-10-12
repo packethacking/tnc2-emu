@@ -2,3 +2,4 @@ target/
 *.ram
 *.ram.tmp
 __pycache__/
+*.uf2
