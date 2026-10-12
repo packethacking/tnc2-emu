@@ -29,6 +29,39 @@ jobs:
             grep -q "CONNECTED to G8KBB-5" /tmp/smoke.txt
           done
 
+  pico:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Pico 2 W firmware
+        working-directory: crates/tnc2-pico
+        run: |
+          cargo clippy --release --locked -- -D warnings
+          cargo build --release --locked
+      - name: Make the UF2
+        run: |
+          sudo apt-get install -y -q libusb-1.0-0
+          curl -sSLo picotool.tar.gz https://github.com/raspberrypi/pico-sdk-tools/releases/download/v2.3.1-0/picotool-2.3.1-x86_64-lin.tar.gz
+          echo "878a1a1e7d8336b8be60300c7218f366d9790c0d3a211b181d6d172e80b1248e  picotool.tar.gz" | sha256sum -c
+          tar xzf picotool.tar.gz
+          picotool/picotool uf2 convert crates/tnc2-pico/target/thumbv8m.main-none-eabihf/release/speedtest -t elf tnc2-pico-speedtest.uf2 --family rp2350-arm-s
+          picotool/picotool info -a tnc2-pico-speedtest.uf2
+      - name: Check the UF2 is one RP2350 region the boot ROM can take in one go
+        run: |
+          python3 - <<'PY'
+          import struct
+          d = open("tnc2-pico-speedtest.uf2", "rb").read()
+          blocks = [struct.unpack("<8I", d[i:i + 32]) for i in range(0, len(d), 512)]
+          assert {b[7] for b in blocks} == {0xE48BFF59}, "family is not rp2350-arm-s"
+          addrs = [b[3] for b in blocks]
+          assert all(b == a + 256 for a, b in zip(addrs, addrs[1:])), "UF2 has gaps"
+          print(f"{len(blocks)} blocks, 0x{addrs[0]:08x} to 0x{addrs[-1] + 256:08x}, rp2350-arm-s")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tnc2-pico-speedtest
+          path: tnc2-pico-speedtest.uf2
+
   interop:
     needs: build
     runs-on: ubuntu-latest
