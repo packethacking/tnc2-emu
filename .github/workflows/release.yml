@@ -6,8 +6,9 @@ name: release
 # description. publish.yml pushes the Docker image for the same tag.
 #
 # Fires on any v* tag push. workflow_dispatch takes an existing tag, to cut
-# a release that failed part way or for a tag pushed before this workflow
-# existed. It never replaces a release: if one exists for the tag, it
+# a release again after a failure outside the code. The tag must have
+# tools/ and versions that match it, so tags before v0.2.0 cannot be
+# released. It never replaces a release: if one exists for the tag, it
 # stops before building anything. Delete it first to cut it again
 # (docs/releasing.md).
 
