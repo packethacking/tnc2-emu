@@ -15,6 +15,8 @@ pub struct Server {
     name: &'static str,
     listener: TcpListener,
     pub clients: Vec<Client>,
+    /// Which client `poll` reads first; it moves on by one each poll.
+    first: usize,
 }
 
 impl Server {
@@ -22,15 +24,19 @@ impl Server {
         let listener = TcpListener::bind(addr)?;
         listener.set_nonblocking(true)?;
         eprintln!("{name}: listening on {addr}");
-        Ok(Server { name, listener, clients: Vec::new() })
+        Ok(Server { name, listener, clients: Vec::new(), first: 0 })
     }
 
     /// Accept new clients and read what is available, client by client,
     /// but no more than `budget` bytes in all. Anything past that stays in
-    /// the socket, so TCP flow control holds the sender back.
+    /// the socket, so TCP flow control holds the sender back. The client
+    /// read first takes turns, so one busy client cannot starve the others
+    /// of the budget.
     pub fn poll(&mut self, budget: usize) -> Vec<Vec<u8>> {
         let mut got = Vec::new();
-        self.poll_with(budget, |_, data| got.push(data.to_vec()));
+        let first = self.first;
+        self.first = self.first.wrapping_add(1);
+        self.poll_with(first, budget, |_, data| got.push(data.to_vec()));
         got
     }
 
@@ -39,7 +45,7 @@ impl Server {
     /// removed). A client's last bytes are decoded even if it then closed.
     pub fn poll_kiss(&mut self) -> Vec<Vec<u8>> {
         let mut frames = Vec::new();
-        self.poll_with(usize::MAX, |c, data| {
+        self.poll_with(0, usize::MAX, |c, data| {
             for &b in data {
                 if let Some(f) = c.kiss.push(b) {
                     frames.push(f.to_vec());
@@ -51,7 +57,8 @@ impl Server {
 
     /// Accept, read and write. `on_data` sees each chunk read while its
     /// client still exists; clients that went away are removed afterwards.
-    fn poll_with(&mut self, mut budget: usize, mut on_data: impl FnMut(&mut Client, &[u8])) {
+    /// Clients are read starting from index `first` (mod the client count).
+    fn poll_with(&mut self, first: usize, mut budget: usize, mut on_data: impl FnMut(&mut Client, &[u8])) {
         loop {
             match self.listener.accept() {
                 Ok((s, a)) => {
@@ -73,7 +80,10 @@ impl Server {
             }
         }
         let mut dead = Vec::new();
-        for (i, c) in self.clients.iter_mut().enumerate() {
+        let n = self.clients.len();
+        for k in 0..n {
+            let i = (first + k) % n;
+            let c = &mut self.clients[i];
             let mut buf = [0u8; 4096];
             while budget > 0 {
                 let want = budget.min(buf.len());
@@ -165,6 +175,33 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert_eq!(got, data);
+    }
+
+    /// Two console clients with the queue nearly full: a client with a
+    /// big backlog must not hold the other one up.
+    #[test]
+    fn budget_is_shared_between_clients() {
+        let mut srv = Server::bind("console", "127.0.0.1:0").unwrap();
+        let addr = srv.listener.local_addr().unwrap();
+        let mut a = TcpStream::connect(addr).unwrap();
+        let mut b = TcpStream::connect(addr).unwrap();
+        for _ in 0..100 {
+            srv.poll(0);
+            if srv.clients.len() == 2 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        a.write_all(&[b'a'; 20000]).unwrap();
+        b.write_all(b"bbbb").unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        // about what the SIO takes per millisecond at 9600 bit/s
+        let mut got = Vec::new();
+        for _ in 0..4 {
+            got.extend(srv.poll(2).concat());
+        }
+        assert_eq!(got.iter().filter(|&&c| c == b'b').count(), 4, "{:?}", String::from_utf8_lossy(&got));
+        assert_eq!(got.len(), 8);
     }
 
     /// One client sends a whole frame and closes while another is part
