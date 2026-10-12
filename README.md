@@ -9,7 +9,7 @@ bank switched EPROM, battery backed RAM) well enough to run the original,
 unmodified TheNet X1J release 2 EPROM images.
 
 The radio port comes out as KISS over TCP and the RS232 port as a plain TCP
-console. Link it to XRouter, BPQ, Direwolf or anything else that speaks TCP
+console. Link it to XRouter, LinBPQ or any other node that speaks TCP
 KISS, and you have a genuine TheNet node on your network: NODES
 broadcasts, level 2 and NET/ROM connects, the lot. Handy for testing how
 modern node software gets on with the old guard, and fun for anyone who
@@ -76,9 +76,9 @@ client at it:
   `IOADDR=<emulator IP>`, `INTNUM=8001`, and a `PORT` on it (see
   `examples/compose/XROUTER.CFG`).
 - LinBPQ: a `PORT` with `TYPE=ASYNC`, `PROTOCOL=KISS`, `IPADDR=<emulator IP>` and `TCPPORT=8001`, plus a `ROUTES` entry for the TheNet node with `NOV2.2=1` (see below and `examples/compose-linbpq/bpq32.cfg`).
-- Direwolf, or anything else with a TCP KISS client: same idea.
+- Any other node with a TCP KISS client: same idea.
 
-XRouter and LinBPQ have been tested; Direwolf and others have not.
+XRouter and LinBPQ have been tested; others have not.
 
 Frames are passed whole, as if over a perfect 1200 bit/s radio channel. The
 node's NODES broadcast interval defaults to 30 minutes, and its radio port
