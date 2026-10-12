@@ -60,6 +60,10 @@ pub struct Channel {
     tx_clock_on: bool,
     next_tx_at: u64,
     tx_ip: bool,
+    /// "Reset Tx interrupt pending" was the last word: no Tx interrupt
+    /// "until after the next character is loaded to the transmit buffer or
+    /// until CRC is completely sent" (UM0081, WR0 command 5).
+    tx_int_disarmed: bool,
     /// Tx underrun/EOM latch is reset ("armed"): an underrun sends the CRC.
     eom_armed: bool,
     in_frame: bool,
@@ -101,6 +105,7 @@ impl Channel {
             tx_clock_on: false,
             next_tx_at: 0,
             tx_ip: false,
+            tx_int_disarmed: false,
             eom_armed: false,
             in_frame: false,
             frame: Vec::new(),
@@ -127,6 +132,7 @@ impl Channel {
         self.shifter = Shifter::Idle;
         self.tx_clock_on = false;
         self.tx_ip = false;
+        self.tx_int_disarmed = false;
         self.eom_armed = false;
         self.in_frame = false;
         self.frame.clear();
@@ -265,16 +271,20 @@ impl Channel {
         self.wr[0] = v;
         self.ptr = (v & 0x07) as usize;
         match (v >> 3) & 0x07 {
-            1 => {
-                // Send abort: "any data being transmitted and any data in
-                // the transmit buffer is lost" (Z80 SIO manual, UM0081).
-                // If that empties a full buffer (a character waiting, or
-                // the CRC going out, when the buffer reads as full) it is
-                // a transmit buffer empty interrupt like any other. TheNet
-                // relies on it: it aborts the padding after a frame when a
-                // new frame is queued, or an underrun mid frame, sets its
-                // transmit state to 6 and starts the next frame from that
-                // interrupt (0x028A, 0x0633, 0x05C2).
+            1 if self.is_sdlc() => {
+                // Send abort, SDLC only: "any data being transmitted and
+                // any data in the transmit buffer is lost" (Z80 SIO
+                // manual, UM0081). If that empties the buffer it is a
+                // transmit buffer empty interrupt like any other, unless
+                // disarmed by a reset Tx interrupt pending since the last
+                // data write. The chip counts the buffer as full while the
+                // CRC goes out (MAME's z80sio does the same), though rr0()
+                // here reports it empty then. TheNet relies on the
+                // interrupt: it aborts the padding after a frame when a new
+                // frame is queued, or an underrun mid frame (after writing
+                // the next byte), sets its transmit state to 6 and starts
+                // the next frame from that interrupt (0x028A, 0x0633,
+                // 0x05C2). The abort's 8 to 13 ones are not timed.
                 let was_full = self.tx_buf.is_some() || matches!(self.shifter, Shifter::Crc(_));
                 if self.in_frame {
                     diag.push(Event::SendAbort { channel: self.name });
@@ -283,8 +293,8 @@ impl Channel {
                 self.frame.clear();
                 self.tx_buf = None;
                 self.shifter = Shifter::Idle;
-                if was_full && self.tx_int_enabled() {
-                    self.tx_ip = true;
+                if was_full {
+                    self.tx_buffer_emptied();
                 }
             }
             2 => {
@@ -299,6 +309,7 @@ impl Channel {
             }
             5 => {
                 self.tx_ip = false;
+                self.tx_int_disarmed = true;
             }
             6 => {
                 self.rr1_latched = 0;
@@ -338,8 +349,17 @@ impl Channel {
         }
     }
 
+    /// The transmit buffer became empty: a Tx interrupt if enabled and not
+    /// disarmed.
+    fn tx_buffer_emptied(&mut self) {
+        if self.tx_int_enabled() && !self.tx_int_disarmed {
+            self.tx_ip = true;
+        }
+    }
+
     fn write_data(&mut self, v: u8, now: u64) {
         self.tx_ip = false;
+        self.tx_int_disarmed = false;
         if self.is_sdlc() {
             self.tx_buf = Some(v);
         } else {
@@ -357,9 +377,7 @@ impl Channel {
         self.shifter = Shifter::Data;
         self.next_tx_at = now + self.char_cycles;
         self.tx_clock_on = true;
-        if self.tx_int_enabled() {
-            self.tx_ip = true;
-        }
+        self.tx_buffer_emptied();
     }
 
     fn read_data(&mut self) -> u8 {
@@ -405,9 +423,7 @@ impl Channel {
                     self.frame.push(b);
                 }
                 self.shifter = Shifter::Data;
-                if self.tx_int_enabled() {
-                    self.tx_ip = true;
-                }
+                self.tx_buffer_emptied();
             } else {
                 match self.shifter {
                     Shifter::Data => {
@@ -435,9 +451,8 @@ impl Channel {
                         if n <= 1 {
                             // CRC done, closing flag loaded
                             self.shifter = Shifter::Idle;
-                            if self.tx_int_enabled() {
-                                self.tx_ip = true;
-                            }
+                            self.tx_int_disarmed = false;
+                            self.tx_buffer_emptied();
                         } else {
                             self.shifter = Shifter::Crc(n - 1);
                         }
@@ -677,9 +692,10 @@ mod tests {
         assert_eq!(c.tx_buf, None);
     }
 
-    /// The same when the abort lands while the CRC is going out.
-    #[test]
-    fn abort_during_crc_interrupts() {
+    /// One byte framed and sent, the Tx interrupt for it taken with a
+    /// reset Tx interrupt pending, and the underrun reached: the CRC is
+    /// going out.
+    fn in_crc() -> (Channel, Diags) {
         let (mut c, mut d) = sdlc();
         c.write_ctrl(0x80, 0, &mut d); // reset Tx CRC
         c.write_data(0x41, 0);
@@ -688,9 +704,40 @@ mod tests {
         c.write_ctrl(0x28, 100, &mut d);
         c.run(200, &mut d); // underrun: CRC
         assert!(matches!(c.shifter, Shifter::Crc(_)));
-        c.write_ctrl(0x28, 200, &mut d);
+        (c, d)
+    }
+
+    /// TheNet's late underrun (0x0633): the Tx interrupt during the CRC
+    /// writes the next byte, then the ext/status interrupt aborts. The
+    /// abort empties the buffer and interrupts.
+    #[test]
+    fn abort_during_crc_with_a_byte_written_interrupts() {
+        let (mut c, mut d) = in_crc();
+        c.write_data(0x42, 200);
         c.write_ctrl(0x08, 210, &mut d);
         assert_eq!(c.pending(), Some(Src::Tx));
+    }
+
+    /// A reset Tx interrupt pending with nothing written since disarms the
+    /// interrupt until the CRC is completely sent, and the abort means it
+    /// never is.
+    #[test]
+    fn abort_during_crc_after_reset_tx_int_is_quiet() {
+        let (mut c, mut d) = in_crc();
+        c.write_ctrl(0x08, 210, &mut d);
+        // the underrun's ext/status interrupt is still pending, nothing else
+        assert_eq!(c.pending(), Some(Src::Ext));
+        assert!(!c.tx_ip);
+    }
+
+    /// Without the abort the CRC completes and rearms the interrupt.
+    #[test]
+    fn crc_done_interrupts_after_reset_tx_int() {
+        let (mut c, mut d) = in_crc();
+        assert!(!c.tx_ip);
+        c.run(400, &mut d);
+        assert_eq!(c.shifter, Shifter::Idle);
+        assert!(c.tx_ip);
     }
 
     /// With the buffer already empty an abort does not interrupt.
@@ -699,5 +746,33 @@ mod tests {
         let (mut c, mut d) = sdlc();
         c.write_ctrl(0x08, 0, &mut d);
         assert_eq!(c.pending(), None);
+    }
+
+    /// An abort with the buffer empty leaves a Tx interrupt that is
+    /// already pending alone.
+    #[test]
+    fn abort_keeps_a_pending_tx_interrupt() {
+        let (mut c, mut d) = sdlc();
+        c.write_data(0x00, 0);
+        c.run(100, &mut d); // into the shifter, buffer empty
+        assert_eq!(c.pending(), Some(Src::Tx));
+        c.write_ctrl(0x08, 110, &mut d);
+        assert_eq!(c.tx_buf, None);
+        assert_eq!(c.pending(), Some(Src::Tx));
+    }
+
+    /// Send abort is an SDLC command; in async mode it does nothing.
+    #[test]
+    fn abort_is_ignored_in_async_mode() {
+        let mut d = Diags::new();
+        let mut c = Channel::new('B', 100);
+        for (r, v) in [(4, 0x44), (1, 0x1f), (5, 0xea)] {
+            c.write_ctrl(r, 0, &mut d);
+            c.write_ctrl(v, 0, &mut d);
+        }
+        c.write_data(0x41, 0);
+        c.write_data(0x42, 10); // waits in the buffer
+        c.write_ctrl(0x08, 20, &mut d);
+        assert_eq!(c.tx_buf, Some(0x42));
     }
 }

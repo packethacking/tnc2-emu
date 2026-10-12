@@ -39,6 +39,7 @@ fn is_conn_req(f: &[u8]) -> bool {
 }
 
 fn run(c_at_ms: u64) -> Outcome {
+    // as interop/run.py: radio port quality 192, NODES broadcasts every 60 s
     let pokes = [Poke { offset: 0x4c, bytes: &[0xc0, 0x00] }, Poke { offset: 0x54, bytes: &[0x3c, 0x00] }];
     let node = NodeConfig { call: Some("G9TNT-1"), alias: Some("TNET"), pokes: &pokes };
     let mut b = Board::from_rom(ROM1, ROM2, &node, &BoardConfig::default()).unwrap();
