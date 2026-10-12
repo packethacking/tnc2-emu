@@ -61,7 +61,7 @@ fn no_code_from_flash() {
     // Limit (the last 32 byte block), attribute 0, enabled.
     const RLAR: u32 = 0x1FFF_FFE0 | 1;
     // SAFETY: this core's own MPU, which nothing else here uses
-    // (embassy-rp guards stacks with MSPLIM on the RP2350).
+    // (the stack guards on the RP2350 are MSPLIM, not the MPU).
     unsafe {
         MPU_CTRL.write_volatile(0);
         cortex_m::asm::dsb();

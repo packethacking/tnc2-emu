@@ -54,6 +54,9 @@ pub struct Status<'a> {
     pub save_failures: u32,
     pub next_save_s: u64,
     pub clock_mhz: u32,
+    /// The clock this boot should have switched to, if it stayed at the
+    /// stock one because the switch failed last time.
+    pub clock_failed_mhz: Option<u32>,
     pub counted_khz: u32,
     pub core_mv: u32,
     pub reset: &'a str,
@@ -122,13 +125,17 @@ impl Status<'_> {
         write!(o, "\r\n")?;
         write!(
             o,
-            "Clock:      {} MHz (counted {}.{} MHz), core {}.{:02} V\r\n",
+            "Clock:      {} MHz (counted {}.{} MHz), core {}.{:02} V",
             self.clock_mhz,
             self.counted_khz / 1000,
             self.counted_khz % 1000 / 100,
             self.core_mv / 1000,
             self.core_mv % 1000 / 10
         )?;
+        if let Some(mhz) = self.clock_failed_mhz {
+            write!(o, "; the switch to {mhz} MHz failed last boot, so stock this time")?;
+        }
+        write!(o, "\r\n")?;
         write!(o, "Last reset: {}\r\n", self.reset)
     }
 }
@@ -170,6 +177,7 @@ mod tests {
             save_failures: 0,
             next_save_s: 408,
             clock_mhz: 250,
+            clock_failed_mhz: None,
             counted_khz: 249_998,
             core_mv: 1250,
             reset: "power on",
@@ -218,6 +226,12 @@ mod tests {
         assert!(t.contains("2 failed"), "{t}");
         let s = Status { rates: None, start: Start::ColdSetup, ..base() };
         assert!(text(&s).contains("still measuring"));
+        let s = Status { clock_mhz: 150, clock_failed_mhz: Some(250), counted_khz: 150_001, core_mv: 1100, ..base() };
+        assert!(
+            text(&s).contains("Clock:      150 MHz (counted 150.0 MHz), core 1.10 V; the switch to 250 MHz failed last boot, so stock this time\r\n"),
+            "{}",
+            text(&s)
+        );
         let s = Status { start: Start::ColdMismatch, rom_call: None, call: None, ..base() };
         assert!(text(&s).contains("ROM's own: unknown"));
     }

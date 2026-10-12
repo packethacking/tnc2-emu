@@ -73,6 +73,12 @@ jobs:
             if [ -n "$left" ]; then echo "$bin has code in flash:"; echo "$left"; exit 1; fi
             echo "$bin: only start up code in flash"
           done
+      - name: Run the node's core 0 loop on an emulated Cortex-M33 (tools/qemu-pace)
+        working-directory: tools/qemu-pace
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q qemu-system-arm
+          cargo run --release --locked
       - name: Check the firmware expects the RAM hash the host gets
         run: |
           want=$(grep -oP 'const HOST_HASH: u64 = 0x\K[0-9a-f]+' crates/tnc2-pico/src/bin/speedtest.rs)

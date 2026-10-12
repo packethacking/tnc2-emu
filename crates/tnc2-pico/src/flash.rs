@@ -15,11 +15,12 @@
 //!
 //! Getting back to reading the flash afterwards: the ROM's
 //! `flash_exit_xip` leaves plain 03h serial reads at a slow, safe clock
-//! divider. If the read mode in use before was one that sends its command
-//! every time (as the boot ROM's default does), the saved QMI settings,
-//! with the clock divider clock.rs chose, are put straight back. A
-//! continuous read mode would need the flash chip itself set up again, so
-//! then the slow mode is simply kept: nothing runs from flash anyway.
+//! divider, and the QMI settings from before (the boot ROM's read mode,
+//! with the clock divider clock.rs chose) are then put straight back. Every
+//! XIP mode the boot ROM sets up sends its 8 bit command each time, so the
+//! flash chip needs nothing else. The other branch, for a continuous read
+//! mode with no command, cannot arise here; it is kept so that such a mode
+//! would get slow but working reads rather than none.
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use embassy_rp::pac;
