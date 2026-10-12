@@ -1,0 +1,10 @@
+[package]
+name = "tnc2-core"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+repository = "https://github.com/packethacking/tnc2-emu"
+description = "The TNC-2 board (Z80, SIO, EPROM, RAM) that runs TheNet X1J, as a no_std library"
+
+[dependencies]
+rustzx-z80 = "0.16.0"

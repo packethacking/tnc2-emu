@@ -1,16 +1,16 @@
 //! tnc2-emu: a TAPR TNC-2 emulator that runs TheNet X1J NET/ROM firmware.
+//!
+//! The board itself is in the tnc2-core crate; this is the host around it:
+//! TCP for the radio and RS232 ports, the RAM file, signals, pacing and
+//! logging.
 
-mod ax25;
 mod net;
-mod sio;
 
-use rustzx_z80::{Z80, Z80Bus};
-use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-
-const ROM_HALF: usize = 0x8000;
+use tnc2_core::rom::{self, RamImageError, RomHalf};
+use tnc2_core::{Board, BoardConfig, NodeConfig, Poke, ax25, kiss};
 
 struct Config {
     rom1: String,
@@ -135,60 +135,25 @@ fn parse_args() -> Config {
     c
 }
 
-fn load_half(path: &str) -> Vec<u8> {
-    let mut d = fs::read(path).unwrap_or_else(|e| {
+fn load_half(path: &str) -> RomHalf {
+    let d = fs::read(path).unwrap_or_else(|e| {
         eprintln!("cannot read {path}: {e}");
         std::process::exit(1)
     });
-    if d.len() > ROM_HALF {
+    rom::pad_half(&d).unwrap_or_else(|_| {
         eprintln!("{path} is larger than 32 KB");
         std::process::exit(1)
-    }
-    // The distribution files have the trailing erased (0xFF) bytes trimmed.
-    d.resize(ROM_HALF, 0xFF);
-    d
+    })
 }
 
 /// Patch the configuration block that sits at the start of both halves.
-fn patch(rom: &mut [u8], c: &Config) {
-    if let Some(call) = &c.call {
-        let (cs, ssid) = match call.split_once('-') {
-            Some((a, b)) => (a, b.parse::<u8>().unwrap_or_else(|_| usage())),
-            None => (call.as_str(), 0),
-        };
-        if cs.len() > 6 || ssid > 15 {
-            usage();
-        }
-        let mut f = [b' '; 6];
-        f[..cs.len()].copy_from_slice(cs.to_ascii_uppercase().as_bytes());
-        rom[0x3B..0x41].copy_from_slice(&f);
-        rom[0x41] = 0x60 | (ssid << 1);
-    }
-    if let Some(alias) = &c.alias {
-        if alias.len() > 6 {
-            usage();
-        }
-        let mut f = [b' '; 6];
-        f[..alias.len()].copy_from_slice(alias.to_ascii_uppercase().as_bytes());
-        rom[0x42..0x48].copy_from_slice(&f);
-    }
-    for (off, bytes) in &c.pokes {
-        rom[*off..*off + bytes.len()].copy_from_slice(bytes);
+fn patch(rom: &mut RomHalf, c: &Config) {
+    let pokes: Vec<Poke> = c.pokes.iter().map(|(offset, bytes)| Poke { offset: *offset, bytes }).collect();
+    let node = NodeConfig { call: c.call.as_deref(), alias: c.alias.as_deref(), pokes: &pokes };
+    if rom::patch(rom, &node).is_err() {
+        usage();
     }
 }
-
-fn fnv(data: &[&[u8]]) -> u64 {
-    let mut h: u64 = 0xcbf29ce484222325;
-    for d in data {
-        for &b in *d {
-            h ^= b as u64;
-            h = h.wrapping_mul(0x100000001b3);
-        }
-    }
-    h
-}
-
-const RAM_MAGIC: &[u8; 8] = b"TNC2RAM1";
 
 static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -205,115 +170,13 @@ fn install_signal_handlers() {
 }
 
 fn save_ram(path: &str, fingerprint: u64, ram: &[u8]) {
-    let mut d = Vec::with_capacity(16 + ram.len());
-    d.extend_from_slice(RAM_MAGIC);
-    d.extend_from_slice(&fingerprint.to_le_bytes());
+    let mut d = Vec::with_capacity(rom::RAM_IMAGE_LEN);
+    d.extend_from_slice(&rom::ram_image_header(fingerprint));
     d.extend_from_slice(ram);
     let tmp = format!("{path}.tmp");
     if fs::write(&tmp, &d).and_then(|_| fs::rename(&tmp, path)).is_err() {
         eprintln!("ram: could not save {path}");
     }
-}
-
-struct Board {
-    rom: [Vec<u8>; 2],
-    ram: Vec<u8>,
-    sio: sio::Sio,
-    cycles: u64,
-    seen_ports: HashSet<(bool, u8)>,
-    adc_channel: u8,
-}
-
-impl Board {
-    fn bank(&self) -> usize {
-        // EPROM A15 is wired to the SIO DTRA pin, which is active low:
-        // WR5A bit 7 set drives the pin low and selects the lower half.
-        if self.sio.a.dtr() { 0 } else { 1 }
-    }
-
-    fn note_port(&mut self, is_out: bool, port: u8, v: u8) {
-        if self.seen_ports.insert((is_out, port)) {
-            eprintln!(
-                "note: first {} port 0x{port:02X}{}",
-                if is_out { "OUT to" } else { "IN from" },
-                if is_out { format!(" value 0x{v:02X}") } else { String::new() }
-            );
-        }
-    }
-}
-
-impl Z80Bus for Board {
-    fn read_internal(&mut self, addr: u16) -> u8 {
-        let a = addr as usize;
-        if a < ROM_HALF {
-            self.rom[self.bank()][a]
-        } else {
-            self.ram[a - ROM_HALF]
-        }
-    }
-    fn write_internal(&mut self, addr: u16, data: u8) {
-        let a = addr as usize;
-        if a >= ROM_HALF {
-            self.ram[a - ROM_HALF] = data;
-        }
-    }
-    fn wait_mreq(&mut self, _addr: u16, clk: usize) {
-        self.cycles += clk as u64;
-    }
-    fn wait_no_mreq(&mut self, _addr: u16, clk: usize) {
-        self.cycles += clk as u64;
-    }
-    fn wait_internal(&mut self, clk: usize) {
-        self.cycles += clk as u64;
-    }
-    fn read_io(&mut self, port: u16) -> u8 {
-        let p = port as u8;
-        self.cycles += 4;
-        match p {
-            0..=3 => {
-                self.sio.run(self.cycles);
-                self.sio.read(p)
-            }
-            0x20 => {
-                // ADC0844 on the optional deviation meter / S meter board.
-                // Not fitted: return zero for every channel.
-                self.note_port(false, p, 0);
-                let _ = self.adc_channel;
-                0
-            }
-            _ => {
-                self.note_port(false, p, 0);
-                0xFF
-            }
-        }
-    }
-    fn write_io(&mut self, port: u16, data: u8) {
-        let p = port as u8;
-        self.cycles += 4;
-        match p {
-            0..=3 => {
-                self.sio.run(self.cycles);
-                self.sio.write(p, data, self.cycles);
-            }
-            0x20 => {
-                self.note_port(true, p, data);
-                self.adc_channel = data;
-            }
-            _ => self.note_port(true, p, data),
-        }
-    }
-    fn read_interrupt(&mut self) -> u8 {
-        self.sio.vector()
-    }
-    fn reti(&mut self) {}
-    fn halt(&mut self, _halted: bool) {}
-    fn int_active(&self) -> bool {
-        self.sio.int_active()
-    }
-    fn nmi_active(&self) -> bool {
-        false
-    }
-    fn pc_callback(&mut self, _addr: u16) {}
 }
 
 fn utc_now() -> String {
@@ -348,49 +211,35 @@ fn hex(b: &[u8]) -> String {
 fn main() {
     let cfg = parse_args();
     install_signal_handlers();
-    if cfg.debug {
-        sio::log::DEBUG.store(true, std::sync::atomic::Ordering::Relaxed);
-    }
     let mut rom1 = load_half(&cfg.rom1);
     let mut rom2 = load_half(&cfg.rom2);
     patch(&mut rom1, &cfg);
     patch(&mut rom2, &cfg);
-    let fingerprint = fnv(&[&rom1, &rom2]);
 
-    let mut ram = vec![0u8; 0x8000];
+    let clock = cfg.clock_hz;
+    let mut board = Board::new(
+        rom1,
+        rom2,
+        &BoardConfig {
+            clock_hz: clock,
+            hdlc_baud: cfg.hdlc_baud,
+            async_baud: cfg.async_baud,
+            // RS232 DCD (SIO DCDB) selects the port mode: asserted = dumb terminal.
+            rs232_dcd: !cfg.protocol_mode,
+        },
+    );
+    let fingerprint = board.fingerprint();
+
     if let (Some(path), false) = (&cfg.ram_file, cfg.cold) {
-        match fs::read(path) {
-            Ok(d) if d.len() == 16 + 0x8000 && &d[..8] == RAM_MAGIC => {
-                let fp = u64::from_le_bytes(d[8..16].try_into().unwrap());
-                if fp == fingerprint {
-                    ram.copy_from_slice(&d[16..]);
-                    eprintln!("ram: restored {path} (warm start)");
-                } else {
-                    eprintln!("ram: {path} was saved with a different ROM configuration, cold start");
-                }
+        match fs::read(path).map(|d| rom::check_ram_image(&d, fingerprint).map(|ram| board.load_ram(ram))) {
+            Ok(Ok(())) => eprintln!("ram: restored {path} (warm start)"),
+            Ok(Err(RamImageError::OtherConfig)) => {
+                eprintln!("ram: {path} was saved with a different ROM configuration, cold start")
             }
-            Ok(_) => eprintln!("ram: {path} is not a RAM image, cold start"),
+            Ok(Err(RamImageError::NotImage)) => eprintln!("ram: {path} is not a RAM image, cold start"),
             Err(_) => eprintln!("ram: no {path} yet, cold start"),
         }
     }
-
-    let clock = cfg.clock_hz;
-    let hdlc_char = clock * 8 / cfg.hdlc_baud;
-    let async_char = clock * 10 / cfg.async_baud;
-    let mut board = Board {
-        rom: [rom1, rom2],
-        ram,
-        sio: sio::Sio::new(hdlc_char, async_char),
-        cycles: 0,
-        seen_ports: HashSet::new(),
-        adc_channel: 0,
-    };
-    // RS232 DCD (SIO DCDB) selects the port mode: asserted = dumb terminal.
-    board.sio.b.dcd = !cfg.protocol_mode;
-    board.sio.b.cts = true;
-    board.sio.a.dcd = false;
-    board.sio.a.cts = true;
-    board.sio.set_ext();
 
     let mut kiss = net::Server::bind("kiss", &format!("{}:{}", cfg.bind, cfg.kiss_port))
         .unwrap_or_else(|e| {
@@ -409,7 +258,6 @@ fn main() {
         })
     });
 
-    let mut cpu = Z80::default();
     eprintln!(
         "{} tnc2-emu: power on, clock {} Hz, speed {}, radio {} bit/s, RS232 {} bit/s, RS232 mode {}",
         utc_now(),
@@ -420,67 +268,55 @@ fn main() {
         if cfg.protocol_mode { "protocol (KISS/crosslink)" } else { "dumb terminal" }
     );
 
-    // The firmware's time base: SIO SYNCB is fed with a 600 Hz square wave
-    // (4.9152 MHz / 8192) and every edge raises an ext/status interrupt.
-    let tick_cycles = clock / 1200;
-    let mut next_tick = tick_cycles;
-    let mut tick_due: u64 = 0;
-
     let slice = clock / 1000; // about 1 ms of emulated time
     let start = Instant::now();
     let mut last_save = Instant::now();
     let mut last_debug = Instant::now();
+    let mut buf = [0u8; 4096];
     loop {
-        let end = board.cycles + slice;
-        while board.cycles < end {
-            while board.cycles >= next_tick {
-                next_tick += tick_cycles;
-                if board.sio.b.wr[1] & 0x01 != 0 {
-                    tick_due += 1;
-                }
+        board.run(slice);
+
+        while let Some(e) = board.pop_event() {
+            if !e.is_debug() {
+                eprintln!("note: {e}");
+            } else if cfg.debug {
+                eprintln!("debug: {e}");
             }
-            if tick_due > 0 && !board.sio.b.ext_pending() {
-                board.sio.b.sync = !board.sio.b.sync;
-                board.sio.set_ext();
-                tick_due -= 1;
-            }
-            board.sio.run(board.cycles);
-            if cpu.is_halted() && !board.sio.int_active() {
-                board.cycles += 4;
-                continue;
-            }
-            cpu.emulate(&mut board);
         }
 
         // radio side: transmitted frames out, received frames in
-        while let Some(f) = board.sio.a.tx_frames.pop_front() {
+        while let Some(f) = board.pop_radio_frame() {
             if cfg.monitor {
                 eprintln!("{} TX {}", utc_now(), ax25::describe(&f));
             }
             if let Some(cap) = capture.as_mut() {
                 let _ = writeln!(cap, "{} TX {}", utc_now(), hex(&f));
             }
-            kiss.send_all(&net::kiss_encode(0x00, &f));
+            kiss.send_all(&kiss::encode(0x00, &f));
         }
         for (i, data) in kiss.poll() {
             for kf in kiss.kiss_decode(i, &data) {
                 if kf.is_empty() || kf[0] & 0x0f != 0 {
                     continue; // only data frames; KISS parameters are ignored
                 }
-                let f = kf[1..].to_vec();
+                let f = &kf[1..];
                 if cfg.monitor {
-                    eprintln!("{} RX {}", utc_now(), ax25::describe(&f));
+                    eprintln!("{} RX {}", utc_now(), ax25::describe(f));
                 }
                 if let Some(cap) = capture.as_mut() {
-                    let _ = writeln!(cap, "{} RX {}", utc_now(), hex(&f));
+                    let _ = writeln!(cap, "{} RX {}", utc_now(), hex(f));
                 }
-                board.sio.a.rx_frames.push_back(f);
+                board.push_radio_frame(f);
             }
         }
 
         // RS232 side
-        if !board.sio.b.tx_bytes.is_empty() {
-            let out = std::mem::take(&mut board.sio.b.tx_bytes);
+        loop {
+            let n = board.read_console(&mut buf);
+            if n == 0 {
+                break;
+            }
+            let out = &buf[..n];
             if cfg.console_echo {
                 let s: String = out
                     .iter()
@@ -492,22 +328,22 @@ fn main() {
                     .collect();
                 eprint!("{s}");
             }
-            console.send_all(&out);
+            console.send_all(out);
         }
         for (_, data) in console.poll() {
-            board.sio.b.rx_bytes.extend(data);
+            board.push_console(&data);
         }
 
         if let Some(path) = &cfg.ram_file {
             if last_save.elapsed() > Duration::from_secs(5) {
                 last_save = Instant::now();
-                save_ram(path, fingerprint, &board.ram);
+                save_ram(path, fingerprint, board.ram());
             }
         }
 
         if STOP.load(std::sync::atomic::Ordering::Relaxed) {
             if let Some(path) = &cfg.ram_file {
-                save_ram(path, fingerprint, &board.ram);
+                save_ram(path, fingerprint, board.ram());
                 eprintln!("ram: saved {path}");
             }
             eprintln!("{} tnc2-emu: power off", utc_now());
@@ -519,20 +355,22 @@ fn main() {
             eprintln!(
                 "debug: t={:.1}s emu={:.1}s pc={:04X} bank={} ticks_due={}",
                 start.elapsed().as_secs_f64(),
-                board.cycles as f64 / clock as f64,
-                cpu.regs.get_pc(),
+                board.cycles() as f64 / clock as f64,
+                board.pc(),
                 board.bank(),
-                tick_due
+                board.ticks_due()
             );
             eprintln!(
                 "debug: txstate(8227)={} slot(8229)={} A: {}",
-                board.ram[0x227], board.ram[0x229], board.sio.a.debug_state()
+                board.ram()[0x227],
+                board.ram()[0x229],
+                board.radio_debug()
             );
         }
 
         // throttle
         if cfg.speed > 0.0 {
-            let target = board.cycles as f64 / (clock as f64 * cfg.speed);
+            let target = board.cycles() as f64 / (clock as f64 * cfg.speed);
             let now = start.elapsed().as_secs_f64();
             if target > now {
                 std::thread::sleep(Duration::from_secs_f64((target - now).min(0.005)));

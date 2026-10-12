@@ -2,15 +2,13 @@
 
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
+use tnc2_core::kiss;
 
 pub struct Client {
     stream: TcpStream,
     out: Vec<u8>,
     pub peer: String,
-    /// KISS decoder state
-    kiss_buf: Vec<u8>,
-    kiss_esc: bool,
-    kiss_in_frame: bool,
+    kiss: Box<kiss::Decoder>,
 }
 
 pub struct Server {
@@ -39,9 +37,7 @@ impl Server {
                         stream: s,
                         out: Vec::new(),
                         peer: a.to_string(),
-                        kiss_buf: Vec::new(),
-                        kiss_esc: false,
-                        kiss_in_frame: false,
+                        kiss: Box::new(kiss::Decoder::new()),
                     });
                 }
                 Err(e) if e.kind() == ErrorKind::WouldBlock => break,
@@ -100,51 +96,13 @@ impl Server {
     /// Feed bytes from client `i` through its KISS decoder, returning
     /// complete KISS frames (command byte included, escapes removed).
     pub fn kiss_decode(&mut self, i: usize, data: &[u8]) -> Vec<Vec<u8>> {
-        const FEND: u8 = 0xC0;
-        const FESC: u8 = 0xDB;
         let c = &mut self.clients[i];
         let mut frames = Vec::new();
         for &b in data {
-            if b == FEND {
-                if c.kiss_in_frame && !c.kiss_buf.is_empty() {
-                    frames.push(std::mem::take(&mut c.kiss_buf));
-                }
-                c.kiss_buf.clear();
-                c.kiss_in_frame = true;
-                c.kiss_esc = false;
-                continue;
-            }
-            if !c.kiss_in_frame {
-                continue;
-            }
-            if c.kiss_esc {
-                c.kiss_esc = false;
-                c.kiss_buf.push(match b {
-                    0xDC => FEND,
-                    0xDD => FESC,
-                    x => x,
-                });
-            } else if b == FESC {
-                c.kiss_esc = true;
-            } else if c.kiss_buf.len() < 2048 {
-                c.kiss_buf.push(b);
+            if let Some(f) = c.kiss.push(b) {
+                frames.push(f.to_vec());
             }
         }
         frames
     }
-}
-
-pub fn kiss_encode(port_cmd: u8, frame: &[u8]) -> Vec<u8> {
-    let mut v = Vec::with_capacity(frame.len() + 4);
-    v.push(0xC0);
-    v.push(port_cmd);
-    for &b in frame {
-        match b {
-            0xC0 => v.extend_from_slice(&[0xDB, 0xDC]),
-            0xDB => v.extend_from_slice(&[0xDB, 0xDD]),
-            x => v.push(x),
-        }
-    }
-    v.push(0xC0);
-    v
 }

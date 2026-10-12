@@ -1,3 +1,7 @@
+[workspace]
+members = ["crates/tnc2-core"]
+default-members = [".", "crates/tnc2-core"]
+
 [package]
 name = "tnc2-emu"
 version = "0.1.0"
@@ -7,4 +11,4 @@ repository = "https://github.com/packethacking/tnc2-emu"
 
 [dependencies]
 libc = "0.2.190"
-rustzx-z80 = "0.16.0"
+tnc2-core = { path = "crates/tnc2-core" }

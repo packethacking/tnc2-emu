@@ -11,6 +11,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and test
         run: cargo test --release --locked
+      - name: Build the core for the Pico 2 W (Cortex-M33, no_std)
+        run: |
+          rustup target add thumbv8m.main-none-eabihf
+          cargo build --locked -p tnc2-core --target thumbv8m.main-none-eabihf
+      - name: Benchmark
+        run: cargo run --release --locked -p tnc2-core --example bench -- 60
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Build and smoke test the image on each platform
