@@ -61,6 +61,11 @@ pub fn config() -> embassy_rp::config::Config {
 }
 
 impl Step {
+    /// The system clock in Hz.
+    pub const fn hz(&self) -> u32 {
+        self.mhz * 1_000_000
+    }
+
     fn vsel(&self) -> u8 {
         // 0.55 V is 0, then 50 mV a step: 1.10 V is 11, 1.30 V is 15.
         ((self.mv - 550) / 50) as u8

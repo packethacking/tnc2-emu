@@ -174,7 +174,7 @@ The repo is a Cargo workspace. The board itself (Z80, SIO, EPROM, RAM, KISS fram
 cargo run --release -p tnc2-core --example bench
 ```
 
-Getting it onto a Raspberry Pi Pico 2 W is under way: see `docs/pico.md`.
+It also runs on a Raspberry Pi Pico 2 W, with a NinoTNC as the radio, though not yet on real hardware: see `docs/pico.md`.
 
 ## Credits and licences
 

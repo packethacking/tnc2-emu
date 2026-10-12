@@ -20,17 +20,16 @@ use alloc::string::String;
 use core::cell::RefCell;
 use core::fmt::Write;
 use embassy_executor::Spawner;
+use embassy_rp::executor::Executor;
 use embassy_futures::select::select;
 use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::signal::Signal;
 use embassy_time::{Instant, Timer};
+use static_cell::StaticCell;
 use tnc2_core::{Board, BoardConfig, NodeConfig, bench};
 use tnc2_pico::clock::{self, STEPS};
-use tnc2_pico::{heap, ram_code, usb, watchdog};
-
-static ROM1: &[u8] = include_bytes!("../../../../rom/THENET1.X1J");
-static ROM2: &[u8] = include_bytes!("../../../../rom/THENET2.X1J");
+use tnc2_pico::{heap, ram_code, rom, usb, watchdog};
 
 /// Emulated seconds per clock, and the RAM hash the host gets after them
 /// (`cargo run --release -p tnc2-core --example bench -- 60`; CI checks
@@ -52,10 +51,10 @@ const GO_RATIO: f64 = 1.25;
 
 #[unsafe(link_section = ".bi_entries")]
 #[used]
-pub static PICOTOOL_ENTRIES: [embassy_rp::binary_info::EntryAddr; 3] = [
-    embassy_rp::binary_info::rp_program_name!(c"tnc2-pico speedtest"),
-    embassy_rp::binary_info::rp_program_description!(c"TheNet X1J emulator speed test, results on USB serial port 2"),
-    embassy_rp::binary_info::rp_cargo_version!(),
+pub static PICOTOOL_ENTRIES: [rp_binary_info::EntryAddr; 3] = [
+    rp_binary_info::rp_program_name!(c"tnc2-pico speedtest"),
+    rp_binary_info::rp_program_description!(c"TheNet X1J emulator speed test, results on USB serial port 2"),
+    rp_binary_info::rp_cargo_version!(),
 ];
 
 /// A finished clock.
@@ -194,9 +193,14 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
     watchdog::reset_now()
 }
 
-#[embassy_executor::main(executor = "embassy_rp::executor::Executor", entry = "cortex_m_rt::entry")]
+#[unsafe(no_mangle)]
+fn tnc2_main() -> ! {
+    static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+    EXECUTOR.init(Executor::new()).run(|spawner| spawner.spawn(main(spawner).expect("main task")))
+}
+
+#[embassy_executor::task]
 async fn main(spawner: Spawner) {
-    ram_code::load();
     // In case whatever ran before left the watchdog running.
     watchdog::stop();
     heap::init();
@@ -265,7 +269,7 @@ async fn main(spawner: Spawner) {
 async fn run_step(i: usize) -> ClockResult {
     let counted_khz = clock::measure_sys_khz();
     let mv = clock::core_mv();
-    let mut board = Board::from_rom(ROM1, ROM2, &NodeConfig::default(), &BoardConfig::default()).expect("ROM images");
+    let mut board = Board::from_rom(rom::lower(), rom::upper(), &NodeConfig::default(), &BoardConfig::default()).expect("ROM images");
     let start_cycles = board.cycles();
     let mut elapsed_us = 0;
     for b in 1..=SECONDS * 1000 / BATCH_MS {
@@ -341,7 +345,7 @@ fn report() -> String {
         o,
         "\r\ntnc2-pico {} speed test: TheNet X1J on an emulated 4.9152 MHz Z80\r\n\
          Each clock runs the node from power on for {SECONDS} emulated seconds.\r\n\
-         {} KB of emulator code runs from SRAM.\r\n\r\n\
+         {} KB of code and constants run from SRAM.\r\n\r\n\
          clock    counted  core    Z80 MHz  ratio  cycles  RAM hash\r\n",
         env!("CARGO_PKG_VERSION"),
         ram_code::size().div_ceil(1024),

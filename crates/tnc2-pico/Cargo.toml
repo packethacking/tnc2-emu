@@ -27,15 +27,24 @@ name = "speedtest"
 test = false
 bench = false
 
+[[bin]]
+name = "node"
+path = "src/bin/node/main.rs"
+test = false
+bench = false
+
 [dependencies]
 tnc2-core = { path = "../tnc2-core" }
+tnc2-node = { path = "../tnc2-node" }
 
-embassy-rp = { version = "=0.10.0", features = ["rp235xa", "time-driver", "critical-section-impl", "unstable-pac", "binary-info", "executor-thread"] }
+embassy-rp = { version = "=0.10.0", features = ["rp235xa", "time-driver", "critical-section-impl", "unstable-pac", "executor-thread"] }
 embassy-executor = "=0.10.0"
 embassy-time = "=0.5.1"
 embassy-sync = "=0.8.0"
 embassy-futures = "=0.1.2"
 embassy-usb = "=0.6.0"
+# Without its own header, which binary_info.rs replaces.
+rp-binary-info = "=0.1.2"
 
 cortex-m = { version = "=0.7.9", features = ["inline-asm"] }
 cortex-m-rt = "=0.7.7"
