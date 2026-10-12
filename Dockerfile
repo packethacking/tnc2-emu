@@ -20,6 +20,11 @@ COPY crates ./crates
 RUN cargo build --release --locked --target "$(cat /rust-target)" -p tnc2-emu \
  && cp "target/$(cat /rust-target)/release/tnc2-emu" /tnc2-emu
 
+# Just the binary, for the release workflow's archives
+# (tools/release-assets.sh): the same build as the image's.
+FROM scratch AS binary
+COPY --from=build /tnc2-emu /tnc2-emu
+
 # Runtime stage: just the binary and the EPROM images
 FROM scratch
 COPY --from=build /tnc2-emu /tnc2-emu

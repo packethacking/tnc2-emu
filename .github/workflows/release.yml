@@ -1,0 +1,68 @@
+name: release
+
+# The GitHub release for a version tag: the Linux binaries, the Pico 2 W
+# UF2s and SHA256SUMS (tools/release-assets.sh), titled with the tag, with
+# .github/release-assets.md and GitHub's generated change notes as the
+# description. publish.yml pushes the Docker image for the same tag.
+#
+# Fires on any v* tag push. workflow_dispatch takes an existing tag, to cut
+# a release that failed part way or for a tag pushed before this workflow
+# existed. It never replaces a release: if one exists for the tag, it
+# stops before building anything. Delete it first to cut it again
+# (docs/releasing.md).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v0.2.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Stop if the release already exists
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::A release for $TAG already exists. This workflow never replaces one; to cut it again, delete it first: gh release delete $TAG"
+            exit 1
+          fi
+          echo "releasing $TAG"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+
+      - name: Check the tag matches every crate's version
+        run: |
+          tools/check-version.sh "$TAG"
+          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Build and test
+        run: cargo test --release --locked
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the release assets
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libusb-1.0-0
+          tools/release-assets.sh "$VERSION" dist
+
+      - name: Publish the release
+        run: |
+          # The asset guide heads the description, with this version in
+          # its file names and links; the generated change notes follow.
+          gh release create "$TAG" dist/* \
+            --verify-tag --title "$TAG" \
+            --notes "$(sed "s/{version}/$VERSION/g" .github/release-assets.md)" --generate-notes

@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check every crate and lock file carries the same version
+        run: tools/check-version.sh
       - name: Build and test
         run: cargo test --release --locked
       - name: Build the core and the node logic for the Pico 2 W (Cortex-M33, no_std)
@@ -33,50 +35,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build the Pico 2 W firmware (speed test and node)
-        working-directory: crates/tnc2-pico
+      # The same script makes the release's UF2s, so what CI checks is
+      # what gets released.
+      - name: Build the Pico 2 W firmware, check its layout, make the UF2s (tools/pico-firmware.sh)
         run: |
-          cargo clippy --release --locked -- -D warnings
-          cargo build --release --locked
-      - name: Check the emulator's hot code is linked into SRAM
-        working-directory: crates/tnc2-pico
-        run: |
-          nm="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-nm"
-          check() {
-            "$nm" -C "target/thumbv8m.main-none-eabihf/release/$1" > symbols.txt
-            shift
-            for f in "$@"; do
-              line=$(grep -E " [tT] $f::h[0-9a-f]+$" symbols.txt)
-              echo "$line"
-              case "$line" in 20*) ;; *) echo "$f is not in SRAM"; exit 1 ;; esac
-            done
-          }
-          check speedtest speedtest::run_batch tnc2_core::Board::run tnc2_core::sio::Channel::run \
-                rustzx_z80::cpu::Z80::emulate rustzx_z80::opcode::group_nonprefixed::execute_normal
-          check node node::core0::run tnc2_core::sio::Channel::run \
-                rustzx_z80::cpu::Z80::emulate rustzx_z80::opcode::group_nonprefixed::execute_normal
-      - name: Check nothing but start up code is left in flash
-        working-directory: crates/tnc2-pico
-        run: |
-          # The node's core 0 keeps running while core 1 writes the flash,
-          # when reading it is a bus fault: all code and read only data
-          # must be in SRAM (memory.x). In flash: the reset handler, the
-          # copy (main), embassy-rp's __pre_init, the hard fault handler and
-          # the long branches from them into SRAM. Nothing else.
-          nm="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-nm"
-          size="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-size"
-          for bin in speedtest node; do
-            elf="target/thumbv8m.main-none-eabihf/release/$bin"
-            "$size" -A "$elf" | awk '$1 == ".rodata" && $2 != 0 { print "read only data in flash: " $2 " bytes"; bad = 1 } END { exit bad }'
-            left=$("$nm" "$elf" | awk '$1 ~ /^1/ && $2 ~ /[tT]/ { print $3 }' | sort -u \
-              | grep -vxE 'Reset|__stext|__etext|main|__pre_init|HardFault|HardFault_|__Thumbv7ABSLongThunk_(main|__pre_init)' || true)
-            if [ -n "$left" ]; then echo "$bin has code in flash:"; echo "$left"; exit 1; fi
-            echo "$bin: only start up code in flash"
-          done
+          sudo apt-get update -q
+          sudo apt-get install -y -q libusb-1.0-0
+          tools/pico-firmware.sh .
       - name: Run the node's core 0 loop on an emulated Cortex-M33 (tools/qemu-pace)
         working-directory: tools/qemu-pace
         run: |
-          sudo apt-get update -q
           sudo apt-get install -y -q qemu-system-arm
           cargo run --release --locked
       - name: Check the firmware expects the RAM hash the host gets
@@ -84,31 +52,6 @@ jobs:
           want=$(grep -oP 'const HOST_HASH: u64 = 0x\K[0-9a-f]+' crates/tnc2-pico/src/bin/speedtest.rs)
           cargo run --release --locked -p tnc2-core --example bench -- 60 | tee bench.txt
           grep -q "RAM hash $want)" bench.txt || { echo "host hash is not $want"; exit 1; }
-      - name: Make the UF2s
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q libusb-1.0-0
-          curl -sSLo picotool.tar.gz https://github.com/raspberrypi/pico-sdk-tools/releases/download/v2.3.1-0/picotool-2.3.1-x86_64-lin.tar.gz
-          echo "878a1a1e7d8336b8be60300c7218f366d9790c0d3a211b181d6d172e80b1248e  picotool.tar.gz" | sha256sum -c
-          tar xzf picotool.tar.gz
-          for bin in speedtest node; do
-            picotool/picotool uf2 convert crates/tnc2-pico/target/thumbv8m.main-none-eabihf/release/$bin -t elf tnc2-pico-$bin.uf2 --family rp2350-arm-s
-            picotool/picotool info -a tnc2-pico-$bin.uf2
-          done
-      - name: Check each UF2 is one RP2350 region the boot ROM can take in one go
-        run: |
-          python3 - <<'PY'
-          import struct
-          for name in ("tnc2-pico-speedtest.uf2", "tnc2-pico-node.uf2"):
-              d = open(name, "rb").read()
-              blocks = [struct.unpack("<8I", d[i:i + 32]) for i in range(0, len(d), 512)]
-              assert {b[7] for b in blocks} == {0xE48BFF59}, f"{name}: family is not rp2350-arm-s"
-              addrs = [b[3] for b in blocks]
-              assert all(b == a + 256 for a, b in zip(addrs, addrs[1:])), f"{name}: UF2 has gaps"
-              # the image must stay clear of the store and the last 4 KB
-              assert addrs[-1] + 256 <= 0x103C0000, f"{name}: runs into the store"
-              print(f"{name}: {len(blocks)} blocks, 0x{addrs[0]:08x} to 0x{addrs[-1] + 256:08x}, rp2350-arm-s")
-          PY
       - uses: actions/upload-artifact@v4
         with:
           name: tnc2-pico-speedtest

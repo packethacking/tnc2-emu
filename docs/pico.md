@@ -25,7 +25,7 @@ The Pico sends two stop bits and the TNC one. That is on purpose: the NinoTNC ga
 
 ## Flashing the node
 
-1. Get `tnc2-pico-node.uf2`: open the latest run of the `ci` workflow on GitHub (Actions tab) and download the `tnc2-pico-node` artifact, or build it yourself (below).
+1. Get the node firmware: `tnc2-emu-<version>-pico2w-node.uf2` from the latest [release](https://github.com/packethacking/tnc2-emu/releases), or for the newest code the `tnc2-pico-node` artifact of the latest run of the `ci` workflow (Actions tab), or build it yourself (below).
 2. Hold the BOOTSEL button on the Pico 2 W while plugging it in. A drive called `RP2350` appears.
 3. Copy the UF2 onto that drive. The Pico restarts by itself and the drive goes away. (Or, with [picotool](https://github.com/raspberrypi/picotool): `picotool load -x tnc2-pico-node.uf2`.)
 
@@ -84,7 +84,7 @@ picotool uf2 convert target/thumbv8m.main-none-eabihf/release/node -t elf tnc2-p
 picotool uf2 convert target/thumbv8m.main-none-eabihf/release/speedtest -t elf tnc2-pico-speedtest.uf2 --family rp2350-arm-s
 ```
 
-The firmware crate pins its own Rust version and target (`rust-toolchain.toml`, `.cargo/config.toml`), and rustup fetches them the first time. It is not part of the repository's Cargo workspace, so host builds never need the embedded toolchain. The parts of the node that need no hardware (the setup commands, the flash store, KISS to the TNC, the queues between the cores, the core 0 loop) are in `crates/tnc2-node`, which is in the workspace and tested by a plain `cargo test`; `tools/qemu-pace` runs the core 0 loop on an emulated Cortex-M33 to check its pacing. The UF2 needs picotool 2.0 or later, which knows the RP2350; CI uses the Linux build Raspberry Pi publish with [pico-sdk-tools](https://github.com/raspberrypi/pico-sdk-tools/releases). Each UF2 is a single block of flash from 0x10000000, which BOOTSEL copying handles in one go. With a debug probe, `cargo run --release --bin node` flashes it directly through probe-rs.
+The firmware crate pins its own Rust version and target (`rust-toolchain.toml`, `.cargo/config.toml`), and rustup fetches them the first time. It is not part of the repository's Cargo workspace, so host builds never need the embedded toolchain. The parts of the node that need no hardware (the setup commands, the flash store, KISS to the TNC, the queues between the cores, the core 0 loop) are in `crates/tnc2-node`, which is in the workspace and tested by a plain `cargo test`; `tools/qemu-pace` runs the core 0 loop on an emulated Cortex-M33 to check its pacing. The UF2 needs picotool 2.0 or later, which knows the RP2350; CI uses the Linux build Raspberry Pi publish with [pico-sdk-tools](https://github.com/raspberrypi/pico-sdk-tools/releases). `tools/pico-firmware.sh OUTDIR` does the whole job as CI and the releases do: it builds both firmwares, checks where their code sits, and makes and checks the UF2s. Each UF2 is a single block of flash from 0x10000000, which BOOTSEL copying handles in one go. With a debug probe, `cargo run --release --bin node` flashes it directly through probe-rs.
 
 ## Under the hood
 

@@ -176,6 +176,8 @@ cargo run --release -p tnc2-core --example bench
 
 It also runs on a Raspberry Pi Pico 2 W, with a NinoTNC as the radio, though not yet on real hardware: see `docs/pico.md`.
 
+Each [release](https://github.com/packethacking/tnc2-emu/releases) has static Linux binaries (x86_64, aarch64, armv7) and the Pico 2 W UF2s; the Docker image is tagged with the same version. How to cut one: `docs/releasing.md`.
+
 ## Credits and licences
 
 - TheNet X1J by Dave Roberts G8KBB, based on TheNet 1.01 by NORD><LINK
