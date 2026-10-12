@@ -7,8 +7,10 @@
 //! wants several clocks in one run, so `set` changes them while running:
 //!
 //! - core voltage first when speeding up, last when slowing down
-//!   (POWMAN VREG, at most 1.30 V, the most the regulator gives without
-//!   unlocking its limit, which this does not do);
+//!   (POWMAN VREG). This sets VREG_CTRL.UNLOCK, which the VREG register
+//!   needs before it takes a new voltage, but not
+//!   VREG_CTRL.DISABLE_VOLTAGE_LIMIT, so the regulator still stops at
+//!   1.30 V, and nothing here asks for more;
 //! - the flash clock divider and read delay, so the flash keeps seeing the
 //!   50 MHz clock and sample point the boot ROM chose at 150 MHz;
 //! - the system PLL, with clk_sys parked on the 12 MHz reference while the
