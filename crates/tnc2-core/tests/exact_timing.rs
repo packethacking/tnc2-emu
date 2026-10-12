@@ -12,6 +12,10 @@
 //! faster. Any change in when an instruction runs or an interrupt is
 //! taken changes them.
 //!
+//! It runs twice: at the TNC-2's own 1200 bit/s radio and 9600 bit/s
+//! RS232, and with a fast RS232 port (115200 bit/s, a character every 427
+//! cycles, so well inside one 600 Hz tick) and a 4800 bit/s radio.
+//!
 //! If a deliberate change to the emulation moves them, check the
 //! transcript (cargo test --release --test exact_timing -- --nocapture)
 //! and record the new values.
@@ -21,8 +25,9 @@ use tnc2_core::{Board, BoardConfig, NodeConfig, Poke, ax25};
 static ROM1: &[u8] = include_bytes!("../../../rom/THENET1.X1J");
 static ROM2: &[u8] = include_bytes!("../../../rom/THENET2.X1J");
 
-const TRACE_HASH: u64 = 0x89797e69acd50f5d;
-const RAM_HASH: u64 = 0xf16dae6ebb7b7542;
+/// (trace, RAM) at the standard and the fast bit rates.
+const STANDARD: (u64, u64) = (0x89797e69acd50f5d, 0xf16dae6ebb7b7542);
+const FAST: (u64, u64) = (0x64abac3eae50cd19, 0xa135c0962044b233);
 
 struct Fnv(u64);
 
@@ -186,10 +191,10 @@ struct Session {
     frames: Vec<(u64, String)>,
 }
 
-fn run_session() -> Session {
+fn run_session(cfg: &BoardConfig) -> Session {
     let pokes = [Poke { offset: 0x4c, bytes: &[0xc0, 0x00] }, Poke { offset: 0x54, bytes: &[0x3c, 0x00] }];
     let node = NodeConfig { call: Some("G9TNT-1"), alias: Some("TNET"), pokes: &pokes };
-    let mut b = Board::from_rom(ROM1, ROM2, &node, &BoardConfig::default()).unwrap();
+    let mut b = Board::from_rom(ROM1, ROM2, &node, cfg).unwrap();
     let per_ms = b.clock_hz() / 1000;
     let end = 120_000 * per_ms;
     let mut script = script().into_iter().map(|(ms, s)| (ms * per_ms, s)).collect::<Vec<_>>().into_iter().peekable();
@@ -252,9 +257,8 @@ fn run_session() -> Session {
     Session { trace: h.0, ram: tnc2_core::rom::fingerprint(&b.ram()[..], &[]), console, frames }
 }
 
-#[test]
-fn emulation_is_unchanged() {
-    let s = run_session();
+fn check(cfg: &BoardConfig, want: (u64, u64)) {
+    let s = run_session(cfg);
     println!("{}", s.console);
     for (t, f) in &s.frames {
         println!("{t:>10} {f}");
@@ -267,5 +271,15 @@ fn emulation_is_unchanged() {
     assert!(has("G9TNT-1>G9XRT <SABM"), "node never connected out");
     assert!(has("G9TNT-1>G9XRT <I"), "node sent no I frames");
     assert!(has("G9TNT-1>NODES"), "no NODES broadcast");
-    assert_eq!((s.trace, s.ram), (TRACE_HASH, RAM_HASH), "the emulation is not what it was");
+    assert_eq!((s.trace, s.ram), want, "the emulation is not what it was");
+}
+
+#[test]
+fn emulation_is_unchanged() {
+    check(&BoardConfig::default(), STANDARD);
+}
+
+#[test]
+fn emulation_is_unchanged_fast_rs232() {
+    check(&BoardConfig { hdlc_baud: 4800, async_baud: 115200, ..BoardConfig::default() }, FAST);
 }
