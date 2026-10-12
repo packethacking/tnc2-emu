@@ -32,6 +32,7 @@ enum Shifter {
     Crc(u8),
 }
 
+#[cfg_attr(test, derive(Clone, Debug))]
 pub struct Channel {
     pub(crate) name: char,
     pub(crate) wr: [u8; 8],
@@ -402,6 +403,37 @@ impl Channel {
         self.run_rx(now, diag);
     }
 
+    /// The first cycle at which `run` could change anything, if nothing
+    /// else touches the channel first: before it, `run` does nothing. It
+    /// may be early (0 is always safe) but never late. Mirrors `run_tx`
+    /// and `run_rx`; keep the three in step.
+    fn next_event(&self) -> u64 {
+        let mut t = u64::MAX;
+        if self.tx_clock_on {
+            t = self.next_tx_at;
+        }
+        if !self.rx_enabled() {
+            if self.is_sdlc() && !self.rx_stream.is_empty() {
+                return 0;
+            }
+            if let Some(d) = self.rx_dcd_off_at {
+                t = t.min(d);
+            }
+        } else if self.is_sdlc() {
+            if !self.rx_stream.is_empty() {
+                t = t.min(self.next_rx_at);
+            } else if let Some(d) = self.rx_dcd_off_at {
+                t = t.min(d);
+            } else if !self.rx_frames.is_empty() && !self.tx_clock_on && !self.rts() {
+                // a frame waiting and the radio not transmitting
+                return 0;
+            }
+        } else if !self.rx_avail && !self.rx_bytes.is_empty() {
+            t = t.min(self.next_rx_at);
+        }
+        t
+    }
+
     fn run_tx(&mut self, now: u64, diag: &mut Diags) {
         if !self.is_sdlc() {
             // async transmitter
@@ -624,6 +656,12 @@ impl Sio {
         self.b.run(now, diag);
     }
 
+    /// The first cycle at which `run` could change anything (see
+    /// `Channel::next_event`).
+    pub fn next_event(&self) -> u64 {
+        self.a.next_event().min(self.b.next_event())
+    }
+
     pub fn set_ext(&mut self) {
         self.a.check_ext();
         self.b.check_ext();
@@ -774,5 +812,79 @@ mod tests {
         c.write_data(0x42, 10); // waits in the buffer
         c.write_ctrl(0x08, 20, &mut d);
         assert_eq!(c.tx_buf, Some(0x42));
+    }
+
+    /// `next_event` is never late: running the channel at any cycle before
+    /// it changes nothing. Random register writes, data, reads, received
+    /// frames and bytes and carrier changes, in both modes, checked before
+    /// every step.
+    #[test]
+    fn next_event_is_never_late() {
+        for sdlc_mode in [true, false] {
+            let mut d = Diags::new();
+            let mut c = Channel::new('A', 100);
+            let setup: &[(u8, u8)] = if sdlc_mode {
+                &[(4, 0x20), (1, 0x1b), (3, 0xc9), (5, 0xeb)]
+            } else {
+                &[(4, 0x44), (1, 0x1f), (3, 0xc1), (5, 0xea)]
+            };
+            for &(r, v) in setup {
+                c.write_ctrl(r, 0, &mut d);
+                c.write_ctrl(v, 0, &mut d);
+            }
+            let regs: &[(u8, u8)] = &[
+                (1, 0x1b),
+                (1, 0x00),
+                (3, 0xc9),
+                (3, 0xc8),
+                (5, 0xeb),
+                (5, 0xe9),
+                (5, 0xe3),
+                (5, 0xe1),
+            ];
+            let cmds = [0x08, 0x10, 0x28, 0x30, 0x80, 0xc0];
+            let mut rng: u64 = 0x9e3779b97f4a7c15;
+            let mut now = 0u64;
+            for step in 0..20_000 {
+                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let r = (rng >> 33) as usize;
+                now += 1 + (r % 400) as u64;
+                let t = c.next_event();
+                for probe in [now, t.saturating_sub(1)] {
+                    if probe >= now && probe < t {
+                        let mut p = c.clone();
+                        p.run(probe, &mut Diags::new());
+                        assert_eq!(alloc::format!("{p:?}"), alloc::format!("{c:?}"), "step {step}: run at {probe} before {t}");
+                    }
+                }
+                c.run(now, &mut d);
+                match (r >> 9) % 9 {
+                    0 => {
+                        let (reg, v) = regs[(r >> 13) % regs.len()];
+                        c.write_ctrl(reg, now, &mut d);
+                        c.write_ctrl(v, now, &mut d);
+                    }
+                    1 => c.write_ctrl(cmds[(r >> 13) % cmds.len()], now, &mut d),
+                    2 => c.write_data(r as u8, now),
+                    3 => {
+                        c.read_data();
+                    }
+                    4 => {
+                        c.read_ctrl();
+                    }
+                    5 if c.rx_frames.len() < 3 => c.rx_frames.push_back(alloc::vec![r as u8; 1 + (r >> 13) % 40]),
+                    6 if c.rx_bytes.len() < 6 => c.rx_bytes.extend([r as u8, (r >> 8) as u8]),
+                    7 => {
+                        c.dcd = !c.dcd;
+                        c.check_ext();
+                    }
+                    _ => {}
+                }
+                // the host takes what was sent
+                c.tx_frames.clear();
+                c.tx_bytes.clear();
+                while d.pop().is_some() {}
+            }
+        }
     }
 }

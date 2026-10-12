@@ -228,6 +228,10 @@ struct Bus {
     ram: alloc::boxed::Box<[u8; RAM_SIZE]>,
     sio: sio::Sio,
     cycles: u64,
+    /// `Board::run` runs instructions back to back while `cycles` is below
+    /// this; an SIO port access sets it to 0 to stop it after that
+    /// instruction.
+    due: u64,
     /// Ports already reported, one bit per (direction, port).
     seen_ports: [u32; 16],
     adc_channel: u8,
@@ -280,6 +284,7 @@ impl Z80Bus for Bus {
         self.cycles += 4;
         match p {
             0..=3 => {
+                self.due = 0;
                 self.sio.run(self.cycles, &mut self.diags);
                 self.sio.read(p)
             }
@@ -301,6 +306,7 @@ impl Z80Bus for Bus {
         self.cycles += 4;
         match p {
             0..=3 => {
+                self.due = 0;
                 self.sio.run(self.cycles, &mut self.diags);
                 self.sio.write(p, data, self.cycles, &mut self.diags);
             }
@@ -354,6 +360,7 @@ impl Board {
             ram,
             sio: sio::Sio::new(hdlc_char, async_char),
             cycles: 0,
+            due: 0,
             seen_ports: [0; 16],
             adc_channel: 0,
             diags: Diags::new(),
@@ -394,10 +401,21 @@ impl Board {
 
     /// Run the CPU for at least `cycles` clock cycles (it stops at the end
     /// of an instruction).
+    ///
+    /// Every instruction boundary is as if the time base and the SIO were
+    /// brought up to date just before it, which is when the Z80 sees the
+    /// interrupt line. Most of the time they have nothing to do, so after
+    /// each instruction this works out the first cycle at which they could
+    /// (the next 600 Hz edge, or the next SIO character, tick or carrier
+    /// change) and runs instructions back to back until then. Only the Z80
+    /// touching the SIO can bring that sooner, and an SIO port access ends
+    /// the run of instructions (`Bus::due`). The host changes the SIO only
+    /// between calls.
     pub fn run(&mut self, cycles: u64) {
         let bus = &mut self.bus;
         let end = bus.cycles + cycles;
         while bus.cycles < end {
+            // One instruction boundary in full, as it always was.
             while bus.cycles >= self.next_tick {
                 self.next_tick += self.tick_cycles;
                 if bus.sio.b.wr[1] & 0x01 != 0 {
@@ -415,6 +433,15 @@ impl Board {
                 continue;
             }
             self.cpu.emulate(bus);
+            // Then the boundaries where all of the above would do nothing.
+            // An edge waiting for the firmware to take the last one is due
+            // at once; a HALT goes back to the full step, which handles the
+            // halted CPU.
+            let tick = if self.tick_due > 0 && !bus.sio.b.ext_pending() { 0 } else { self.next_tick };
+            bus.due = end.min(tick).min(bus.sio.next_event());
+            while bus.cycles < bus.due && !self.cpu.is_halted() {
+                self.cpu.emulate(bus);
+            }
         }
     }
 
