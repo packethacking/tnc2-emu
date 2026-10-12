@@ -428,7 +428,6 @@ dependencies = [
  "pio",
  "rand_core 0.6.4",
  "rand_core 0.9.5",
- "rp-binary-info",
  "rp-pac",
  "rp2040-boot2",
  "sha2-const-stable",
@@ -1423,6 +1422,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tnc2-node"
+version = "0.1.0"
+dependencies = [
+ "tnc2-core",
+]
+
+[[package]]
 name = "tnc2-pico"
 version = "0.1.0"
 dependencies = [
@@ -1435,8 +1441,10 @@ dependencies = [
  "embassy-time",
  "embassy-usb",
  "embedded-alloc",
+ "rp-binary-info",
  "static_cell",
  "tnc2-core",
+ "tnc2-node",
 ]
 
 [[package]]
