@@ -4,6 +4,7 @@
 use crate::{RAM_SIZE, ROM_HALF};
 use alloc::boxed::Box;
 use alloc::vec;
+use core::fmt;
 
 /// One 32 KB half of the 27512 EPROM.
 pub type RomHalf = Box<[u8; ROM_HALF]>;
@@ -22,6 +23,24 @@ pub enum ConfigError {
     BadAlias,
     /// A poke runs past the end of the ROM half.
     PokeOutOfRange,
+}
+
+impl fmt::Display for RomError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RomError::TooLarge => f.write_str("ROM image is larger than 32 KB"),
+        }
+    }
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ConfigError::BadCall => "callsign must be up to 6 characters with an optional SSID from 0 to 15",
+            ConfigError::BadAlias => "alias must be up to 6 characters",
+            ConfigError::PokeOutOfRange => "poke runs past the end of the 32 KB ROM half",
+        })
+    }
 }
 
 /// Pad a ROM file to 32 KB. The distribution files have the trailing
@@ -111,6 +130,15 @@ pub enum RamImageError {
     NotImage,
     /// Saved with a different ROM configuration.
     OtherConfig,
+}
+
+impl fmt::Display for RamImageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            RamImageError::NotImage => "not a RAM image",
+            RamImageError::OtherConfig => "saved with a different ROM configuration",
+        })
+    }
 }
 
 /// The 16 byte header that goes in front of the RAM in a saved image.

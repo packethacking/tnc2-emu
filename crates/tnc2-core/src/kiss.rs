@@ -8,8 +8,8 @@ pub const FESC: u8 = 0xDB;
 pub const TFEND: u8 = 0xDC;
 pub const TFESC: u8 = 0xDD;
 
-/// Longest KISS frame the decoder keeps, command byte included. Anything
-/// past this is dropped and the frame is delivered short.
+/// Longest KISS frame the decoder accepts, command byte included. Longer
+/// frames are dropped whole.
 pub const MAX_FRAME: usize = 2048;
 
 /// Encode one frame, handing the output to `out` a byte at a time:
@@ -41,12 +41,16 @@ pub fn encode(port_cmd: u8, frame: &[u8]) -> Vec<u8> {
 }
 
 /// Stream decoder with a fixed buffer. Bytes before the first FEND are
-/// ignored and empty frames (back to back FENDs) are skipped.
+/// ignored, empty frames (back to back FENDs) are skipped, and frames
+/// longer than `MAX_FRAME` are dropped.
 pub struct Decoder {
     buf: [u8; MAX_FRAME],
     len: usize,
     esc: bool,
     in_frame: bool,
+    /// The frame being received has run past `MAX_FRAME`.
+    overflow: bool,
+    dropped: u64,
 }
 
 impl Default for Decoder {
@@ -57,7 +61,12 @@ impl Default for Decoder {
 
 impl Decoder {
     pub const fn new() -> Self {
-        Decoder { buf: [0; MAX_FRAME], len: 0, esc: false, in_frame: false }
+        Decoder { buf: [0; MAX_FRAME], len: 0, esc: false, in_frame: false, overflow: false, dropped: 0 }
+    }
+
+    /// Overlong frames dropped so far.
+    pub fn dropped(&self) -> u64 {
+        self.dropped
     }
 
     /// Feed one byte. Returns a complete frame, command byte first and
@@ -65,10 +74,14 @@ impl Decoder {
     pub fn push(&mut self, b: u8) -> Option<&[u8]> {
         if b == FEND {
             let n = self.len;
-            let done = self.in_frame && n > 0;
+            let done = self.in_frame && n > 0 && !self.overflow;
+            if self.overflow {
+                self.dropped += 1;
+            }
             self.len = 0;
             self.in_frame = true;
             self.esc = false;
+            self.overflow = false;
             return if done { Some(&self.buf[..n]) } else { None };
         }
         if !self.in_frame {
@@ -90,6 +103,8 @@ impl Decoder {
         if self.len < MAX_FRAME {
             self.buf[self.len] = v;
             self.len += 1;
+        } else {
+            self.overflow = true;
         }
         None
     }
@@ -138,11 +153,17 @@ mod tests {
     }
 
     #[test]
-    fn long_frames_are_truncated() {
-        let frame = vec![0x11; MAX_FRAME + 10];
+    fn long_frames_are_dropped() {
         let mut d = Decoder::new();
-        let got = decode_all(&mut d, &encode(0x00, &frame));
+        // command byte plus MAX_FRAME - 1 bytes just fits
+        let fits = vec![FEND; MAX_FRAME - 1];
+        let got = decode_all(&mut d, &encode(0x00, &fits));
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].len(), MAX_FRAME);
+        // one more byte and the frame is dropped; the next one still decodes
+        let mut data = encode(0x00, &vec![0x11; MAX_FRAME]);
+        data.extend(encode(0x00, b"ok"));
+        assert_eq!(decode_all(&mut d, &data), [b"\x00ok".to_vec()]);
+        assert_eq!(d.dropped(), 1);
     }
 }

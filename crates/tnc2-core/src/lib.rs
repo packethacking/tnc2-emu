@@ -35,6 +35,15 @@ pub const ROM_HALF: usize = 0x8000;
 /// Battery backed RAM at 0x8000 to 0xFFFF.
 pub const RAM_SIZE: usize = 0x8000;
 
+/// Received radio frames waiting for the SIO. More than this and new
+/// frames are dropped: at 1200 bit/s it is minutes of traffic.
+pub const RADIO_RX_QUEUE: usize = 64;
+/// Longest received radio frame accepted, in bytes.
+pub const RADIO_RX_MAX_FRAME: usize = 2048;
+/// Console bytes waiting for the SIO. More than this and new bytes are
+/// dropped: at 9600 bit/s it is about 17 seconds of typing.
+pub const CONSOLE_RX_QUEUE: usize = 16384;
+
 /// Clocks and the state of the RS232 DCD pin.
 #[derive(Clone, Copy, Debug)]
 pub struct BoardConfig {
@@ -47,6 +56,42 @@ pub struct BoardConfig {
     /// RS232 DCD (SIO DCDB): asserted is the dumb terminal console, clear
     /// is TheNet's KISS/crosslink protocol mode.
     pub rs232_dcd: bool,
+}
+
+/// A `BoardConfig` the board cannot run with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BoardConfigError {
+    /// The clock must be at least 1200 Hz, for the 600 Hz time base (and
+    /// small enough that cycle counts cannot overflow).
+    BadClock,
+    /// The radio bit rate must be above 0 and no more than 8 times the clock.
+    BadHdlcBaud,
+    /// The RS232 bit rate must be above 0 and no more than 10 times the clock.
+    BadAsyncBaud,
+}
+
+impl fmt::Display for BoardConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            BoardConfigError::BadClock => "CPU clock must be at least 1200 Hz",
+            BoardConfigError::BadHdlcBaud => "radio bit rate must be above 0 and at most 8 times the CPU clock",
+            BoardConfigError::BadAsyncBaud => "RS232 bit rate must be above 0 and at most 10 times the CPU clock",
+        })
+    }
+}
+
+impl BoardConfig {
+    /// Character times in clock cycles (radio, RS232), or why the
+    /// configuration cannot work.
+    fn char_cycles(&self) -> Result<(u64, u64), BoardConfigError> {
+        if self.clock_hz < 1200 || self.clock_hz.checked_mul(10).is_none() {
+            return Err(BoardConfigError::BadClock);
+        }
+        let per_char = |bits: u64, baud: u64| (self.clock_hz * bits).checked_div(baud).filter(|&c| c > 0);
+        let hdlc = per_char(8, self.hdlc_baud).ok_or(BoardConfigError::BadHdlcBaud)?;
+        let async_ = per_char(10, self.async_baud).ok_or(BoardConfigError::BadAsyncBaud)?;
+        Ok((hdlc, async_))
+    }
 }
 
 impl Default for BoardConfig {
@@ -69,12 +114,26 @@ pub enum Event {
     UnderrunWithEom { channel: char, bytes: usize },
     /// The receiver was switched off part way through a frame.
     RxDisabledMidFrame { channel: char, chars: usize },
+    /// The radio receive queue is full and frames are being dropped.
+    /// Reported once at the start of each run of drops.
+    RadioRxDropped { total: u64 },
+    /// A received radio frame was too long and has been dropped.
+    RadioRxTooLong { bytes: usize },
+    /// The console receive queue is full and bytes are being dropped.
+    /// Reported once at the start of each run of drops.
+    ConsoleRxDropped { total: u64 },
 }
 
 impl Event {
     /// Chatty SIO diagnostics, only of interest when debugging.
     pub fn is_debug(&self) -> bool {
-        !matches!(self, Event::FirstPortAccess { .. })
+        matches!(
+            self,
+            Event::SendAbort { .. }
+                | Event::TxDisabledMidFrame { .. }
+                | Event::UnderrunWithEom { .. }
+                | Event::RxDisabledMidFrame { .. }
+        )
     }
 }
 
@@ -95,6 +154,18 @@ impl fmt::Display for Event {
             Event::RxDisabledMidFrame { channel, chars } => {
                 write!(f, "SIO {channel}: receiver disabled mid frame, {chars} characters lost")
             }
+            Event::RadioRxDropped { total } => write!(
+                f,
+                "radio receive queue full ({RADIO_RX_QUEUE} frames), dropping frames; {total} dropped so far"
+            ),
+            Event::RadioRxTooLong { bytes } => write!(
+                f,
+                "received radio frame of {bytes} bytes is longer than {RADIO_RX_MAX_FRAME}, dropped"
+            ),
+            Event::ConsoleRxDropped { total } => write!(
+                f,
+                "console receive queue full ({CONSOLE_RX_QUEUE} bytes), dropping input; {total} bytes dropped so far"
+            ),
         }
     }
 }
@@ -242,15 +313,18 @@ pub struct Board {
     tick_cycles: u64,
     next_tick: u64,
     tick_due: u64,
+    radio_rx_dropped: u64,
+    radio_rx_dropping: bool,
+    console_rx_dropped: u64,
+    console_rx_dropping: bool,
 }
 
 impl Board {
     /// Power on a board with two padded and already patched EPROM halves.
     /// The RAM starts zeroed (a cold start) until `load_ram`.
-    pub fn new(lower: RomHalf, upper: RomHalf, cfg: &BoardConfig) -> Board {
+    pub fn new(lower: RomHalf, upper: RomHalf, cfg: &BoardConfig) -> Result<Board, BoardConfigError> {
         let clock = cfg.clock_hz;
-        let hdlc_char = clock * 8 / cfg.hdlc_baud;
-        let async_char = clock * 10 / cfg.async_baud;
+        let (hdlc_char, async_char) = cfg.char_cycles()?;
         let fingerprint = rom::fingerprint(&lower[..], &upper[..]);
         let ram = alloc::vec![0u8; RAM_SIZE].into_boxed_slice().try_into().expect("32 KB");
         let mut bus = Bus {
@@ -271,7 +345,7 @@ impl Board {
         // wave (4.9152 MHz / 8192) and every edge raises an ext/status
         // interrupt.
         let tick_cycles = clock / 1200;
-        Board {
+        Ok(Board {
             cpu: Z80::default(),
             bus,
             clock_hz: clock,
@@ -279,7 +353,11 @@ impl Board {
             tick_cycles,
             next_tick: tick_cycles,
             tick_due: 0,
-        }
+            radio_rx_dropped: 0,
+            radio_rx_dropping: false,
+            console_rx_dropped: 0,
+            console_rx_dropping: false,
+        })
     }
 
     /// Pad the two ROM images, patch the configuration block in both and
@@ -289,7 +367,7 @@ impl Board {
         let mut upper = rom::pad_half(rom2).map_err(Error::Rom)?;
         rom::patch(&mut lower, node).map_err(Error::Config)?;
         rom::patch(&mut upper, node).map_err(Error::Config)?;
-        Ok(Board::new(lower, upper, cfg))
+        Board::new(lower, upper, cfg).map_err(Error::Board)
     }
 
     /// Run the CPU for at least `cycles` clock cycles (it stops at the end
@@ -334,8 +412,36 @@ impl Board {
 
     /// Hand a received radio frame (AX.25, no CRC) to the SIO. Frames are
     /// queued and arrive one after another, as if behind carrier detect.
-    pub fn push_radio_frame(&mut self, frame: &[u8]) {
-        self.bus.sio.a.rx_frames.push_back(frame.to_vec());
+    /// Returns false, and drops the frame, if it is longer than
+    /// `RADIO_RX_MAX_FRAME` or `RADIO_RX_QUEUE` frames are already waiting.
+    pub fn push_radio_frame(&mut self, frame: &[u8]) -> bool {
+        if frame.len() > RADIO_RX_MAX_FRAME {
+            self.radio_rx_dropped += 1;
+            self.bus.diags.push(Event::RadioRxTooLong { bytes: frame.len() });
+            return false;
+        }
+        let q = &mut self.bus.sio.a.rx_frames;
+        if q.len() >= RADIO_RX_QUEUE {
+            self.radio_rx_dropped += 1;
+            if !self.radio_rx_dropping {
+                self.radio_rx_dropping = true;
+                self.bus.diags.push(Event::RadioRxDropped { total: self.radio_rx_dropped });
+            }
+            return false;
+        }
+        q.push_back(frame.to_vec());
+        self.radio_rx_dropping = false;
+        true
+    }
+
+    /// Received radio frames waiting to be handed to the SIO.
+    pub fn radio_rx_pending(&self) -> usize {
+        self.bus.sio.a.rx_frames.len()
+    }
+
+    /// Radio frames dropped since power on (queue full or too long).
+    pub fn radio_rx_dropped(&self) -> u64 {
+        self.radio_rx_dropped
     }
 
     /// Take the next frame the node has transmitted.
@@ -343,9 +449,32 @@ impl Board {
         self.bus.sio.a.tx_frames.pop_front()
     }
 
-    /// Bytes typed on the RS232 port.
-    pub fn push_console(&mut self, bytes: &[u8]) {
-        self.bus.sio.b.rx_bytes.extend(bytes);
+    /// Bytes typed on the RS232 port. Returns how many were taken; the
+    /// rest are dropped once `CONSOLE_RX_QUEUE` bytes are waiting.
+    pub fn push_console(&mut self, bytes: &[u8]) -> usize {
+        let q = &mut self.bus.sio.b.rx_bytes;
+        let n = bytes.len().min(CONSOLE_RX_QUEUE.saturating_sub(q.len()));
+        q.extend(&bytes[..n]);
+        if n < bytes.len() {
+            self.console_rx_dropped += (bytes.len() - n) as u64;
+            if !self.console_rx_dropping {
+                self.console_rx_dropping = true;
+                self.bus.diags.push(Event::ConsoleRxDropped { total: self.console_rx_dropped });
+            }
+        } else if n > 0 {
+            self.console_rx_dropping = false;
+        }
+        n
+    }
+
+    /// Console bytes waiting to be handed to the SIO.
+    pub fn console_rx_pending(&self) -> usize {
+        self.bus.sio.b.rx_bytes.len()
+    }
+
+    /// Console bytes dropped since power on because the queue was full.
+    pub fn console_rx_dropped(&self) -> u64 {
+        self.console_rx_dropped
     }
 
     /// Copy out what the node has sent on the RS232 port, up to the size
@@ -405,6 +534,17 @@ impl Board {
 pub enum Error {
     Rom(RomError),
     Config(ConfigError),
+    Board(BoardConfigError),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::Rom(e) => e.fmt(f),
+            Error::Config(e) => e.fmt(f),
+            Error::Board(e) => e.fmt(f),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -431,7 +571,7 @@ mod tests {
     #[test]
     fn starts_in_upper_half() {
         let (lo, hi) = halves(false);
-        let mut b = Board::new(lo, hi, &BoardConfig::default());
+        let mut b = Board::new(lo, hi, &BoardConfig::default()).unwrap();
         b.run(1000);
         assert_eq!(b.bank(), 1);
         assert_eq!(b.ram()[0], 0x22);
@@ -440,10 +580,84 @@ mod tests {
     #[test]
     fn dtr_switches_to_lower_half_on_next_fetch() {
         let (lo, hi) = halves(true);
-        let mut b = Board::new(lo, hi, &BoardConfig::default());
+        let mut b = Board::new(lo, hi, &BoardConfig::default()).unwrap();
         b.run(1000);
         assert_eq!(b.bank(), 0);
         assert_eq!(b.ram()[0], 0x11);
+    }
+
+    #[test]
+    fn bad_board_config_is_rejected() {
+        let try_cfg = |cfg: BoardConfig| {
+            let (lo, hi) = halves(false);
+            Board::new(lo, hi, &cfg).err()
+        };
+        let d = BoardConfig::default();
+        assert_eq!(try_cfg(d), None);
+        assert_eq!(try_cfg(BoardConfig { clock_hz: 1199, ..d }), Some(BoardConfigError::BadClock));
+        assert_eq!(try_cfg(BoardConfig { clock_hz: 0, ..d }), Some(BoardConfigError::BadClock));
+        assert_eq!(try_cfg(BoardConfig { hdlc_baud: 0, ..d }), Some(BoardConfigError::BadHdlcBaud));
+        assert_eq!(try_cfg(BoardConfig { async_baud: 0, ..d }), Some(BoardConfigError::BadAsyncBaud));
+        assert_eq!(try_cfg(BoardConfig { hdlc_baud: d.clock_hz * 8 + 1, ..d }), Some(BoardConfigError::BadHdlcBaud));
+        assert_eq!(try_cfg(BoardConfig { clock_hz: u64::MAX, ..d }), Some(BoardConfigError::BadClock));
+        // the slowest clock that works still runs
+        let (lo, hi) = halves(true);
+        let mut b = Board::new(lo, hi, &BoardConfig { clock_hz: 1200, hdlc_baud: 1200, async_baud: 1200, ..d }).unwrap();
+        b.run(1000);
+        assert_eq!(b.ram()[0], 0x11);
+    }
+
+    #[test]
+    fn radio_input_is_capped() {
+        let (lo, hi) = halves(false);
+        let mut b = Board::new(lo, hi, &BoardConfig::default()).unwrap();
+        for _ in 0..RADIO_RX_QUEUE {
+            assert!(b.push_radio_frame(&[0; 20]));
+        }
+        assert_eq!(b.radio_rx_pending(), RADIO_RX_QUEUE);
+        assert!(!b.push_radio_frame(&[0; 20]));
+        assert!(!b.push_radio_frame(&[0; 20]));
+        assert!(!b.push_radio_frame(&[0; RADIO_RX_MAX_FRAME + 1]));
+        assert_eq!(b.radio_rx_pending(), RADIO_RX_QUEUE);
+        assert_eq!(b.radio_rx_dropped(), 3);
+        // one report per run of drops, plus the overlong frame
+        assert_eq!(b.pop_event(), Some(Event::RadioRxDropped { total: 1 }));
+        assert_eq!(b.pop_event(), Some(Event::RadioRxTooLong { bytes: RADIO_RX_MAX_FRAME + 1 }));
+        assert_eq!(b.pop_event(), None);
+    }
+
+    #[test]
+    fn console_input_is_capped() {
+        let (lo, hi) = halves(false);
+        let mut b = Board::new(lo, hi, &BoardConfig::default()).unwrap();
+        assert_eq!(b.push_console(&[b'x'; CONSOLE_RX_QUEUE - 10]), CONSOLE_RX_QUEUE - 10);
+        assert_eq!(b.push_console(&[b'y'; 25]), 10);
+        assert_eq!(b.push_console(b"z"), 0);
+        assert_eq!(b.console_rx_pending(), CONSOLE_RX_QUEUE);
+        assert_eq!(b.console_rx_dropped(), 16);
+        assert_eq!(b.pop_event(), Some(Event::ConsoleRxDropped { total: 15 }));
+        assert_eq!(b.pop_event(), None);
+    }
+
+    #[test]
+    fn errors_display_plain_ascii() {
+        use alloc::string::ToString;
+        let msgs = [
+            Error::Rom(RomError::TooLarge).to_string(),
+            Error::Config(ConfigError::BadCall).to_string(),
+            Error::Config(ConfigError::BadAlias).to_string(),
+            Error::Config(ConfigError::PokeOutOfRange).to_string(),
+            Error::Board(BoardConfigError::BadClock).to_string(),
+            Error::Board(BoardConfigError::BadHdlcBaud).to_string(),
+            Error::Board(BoardConfigError::BadAsyncBaud).to_string(),
+            rom::RamImageError::NotImage.to_string(),
+            rom::RamImageError::OtherConfig.to_string(),
+            Event::ConsoleRxDropped { total: 3 }.to_string(),
+        ];
+        for m in msgs {
+            assert!(!m.is_empty() && m.is_ascii(), "{m:?}");
+        }
+        assert_eq!(Error::Rom(RomError::TooLarge).to_string(), "ROM image is larger than 32 KB");
     }
 
     #[test]

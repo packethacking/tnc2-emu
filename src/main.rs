@@ -227,7 +227,8 @@ fn main() {
             // RS232 DCD (SIO DCDB) selects the port mode: asserted = dumb terminal.
             rs232_dcd: !cfg.protocol_mode,
         },
-    );
+    )
+    .unwrap_or_else(|_| usage());
     let fingerprint = board.fingerprint();
 
     if let (Some(path), false) = (&cfg.ram_file, cfg.cold) {
@@ -294,20 +295,18 @@ fn main() {
             }
             kiss.send_all(&kiss::encode(0x00, &f));
         }
-        for (i, data) in kiss.poll() {
-            for kf in kiss.kiss_decode(i, &data) {
-                if kf.is_empty() || kf[0] & 0x0f != 0 {
-                    continue; // only data frames; KISS parameters are ignored
-                }
-                let f = &kf[1..];
-                if cfg.monitor {
-                    eprintln!("{} RX {}", utc_now(), ax25::describe(f));
-                }
-                if let Some(cap) = capture.as_mut() {
-                    let _ = writeln!(cap, "{} RX {}", utc_now(), hex(f));
-                }
-                board.push_radio_frame(f);
+        for kf in kiss.poll_kiss() {
+            if kf.is_empty() || kf[0] & 0x0f != 0 {
+                continue; // only data frames; KISS parameters are ignored
             }
+            let f = &kf[1..];
+            if cfg.monitor {
+                eprintln!("{} RX {}", utc_now(), ax25::describe(f));
+            }
+            if let Some(cap) = capture.as_mut() {
+                let _ = writeln!(cap, "{} RX {}", utc_now(), hex(f));
+            }
+            board.push_radio_frame(f);
         }
 
         // RS232 side
@@ -330,7 +329,7 @@ fn main() {
             }
             console.send_all(out);
         }
-        for (_, data) in console.poll() {
+        for data in console.poll() {
             board.push_console(&data);
         }
 
