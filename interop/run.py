@@ -293,6 +293,18 @@ def main():
             c.drain()
             return c
 
+        def tn_leave(line):
+            # Leave the far node and wait for TheNet to say the session has
+            # ended. A quiet console is not enough: the far node can take
+            # longer to disconnect than the quiet window, and the next
+            # command would then go into the old session.
+            r = tn.cmd(line, quiet=5, limit=40)
+            if not re.search(r"Welcome back", r, re.I):
+                try:
+                    tn.expect(r"Welcome back", 30)
+                except TimeoutError:
+                    tn_log.write(f"\n[{now()} no 'Welcome back' after {line}]\n")
+
         def tn_relogin():
             tn_log.write(f"\n[{now()} back to the TheNet node prompt]\n")
             tn.drain(2, 10)
@@ -368,7 +380,7 @@ def main():
             got = f"{XR_CALL}:{XR_ALIAS}}}" in r2
             check("NET/ROM connect TheNet -> XRouter alias", got and on_wire,
                   f"XRouter prompt: {got}, CONN REQ/ACK on the wire: {on_wire}")
-            tn.cmd("BYE", quiet=5, limit=40)
+            tn_leave("BYE")
         else:
             check("NET/ROM connect TheNet -> XRouter alias", False, "no connect")
             tn.drain(3, 30)
@@ -384,7 +396,7 @@ def main():
             on_wire = wire_count(ua) > n_ua
             check("L2 downlink TheNet -> XRouter PMS callsign", on_wire and len(r2.strip()) > 0,
                   f"UA from {XR_PMSCALL} on the wire: {on_wire}, PMS answered: {len(r2.strip()) > 0}")
-            tn.cmd("B", quiet=5, limit=40)
+            tn_leave("B")
         else:
             check("L2 downlink TheNet -> XRouter PMS callsign", False, "no connect")
             tn.drain(3, 30)
