@@ -30,7 +30,7 @@ Each line is one clock speed:
 |--------|---------|
 | clock | the system clock asked for |
 | counted | the clock the chip actually ran at, in MHz, measured by its own frequency counter |
-| core | the core voltage |
+| core | the core voltage, read back from the regulator; a `*` marks a row from before a restart, which shows the voltage asked for |
 | Z80 MHz | how fast the emulated Z80 ran; a real TNC-2 is 4.9152 |
 | ratio | emulated time over real time. 1.00 is exactly fast enough |
 | cycles | Pico clock cycles per Z80 clock cycle; multiply by 4.9152 for the clock real time needs |

@@ -43,7 +43,7 @@ jobs:
         run: |
           nm="$(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin/llvm-nm"
           "$nm" -C target/thumbv8m.main-none-eabihf/release/speedtest > symbols.txt
-          for f in speedtest::run_batch tnc2_core::sio::Channel::run \
+          for f in speedtest::run_batch tnc2_core::Board::run tnc2_core::sio::Channel::run \
                    rustzx_z80::opcode::group_nonprefixed::execute_normal; do
             line=$(grep -E " [tT] $f::h[0-9a-f]+$" symbols.txt)
             echo "$line"

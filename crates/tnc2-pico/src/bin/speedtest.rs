@@ -60,18 +60,21 @@ pub static PICOTOOL_ENTRIES: [embassy_rp::binary_info::EntryAddr; 3] = [
 
 /// A finished clock.
 #[derive(Clone, Copy)]
-struct Result {
+struct ClockResult {
     /// Clock counted by the chip's frequency counter, kHz.
     counted_khz: u32,
     /// Emulated Z80 clock, kHz.
     z80_khz: u32,
+    /// Core voltage read back from the regulator, mV. `None` when restored
+    /// after a restart, which shows the voltage asked for instead.
+    mv: Option<u32>,
     /// `None` when restored after a restart, which keeps only whether it
     /// matched.
     ram_hash: Option<u64>,
     hash_ok: bool,
 }
 
-impl Result {
+impl ClockResult {
     fn ratio(&self) -> f64 {
         self.z80_khz as f64 / (BoardConfig::default().clock_hz as f64 / 1000.0)
     }
@@ -84,7 +87,7 @@ enum State {
     Running {
         seconds: u32,
     },
-    Done(Result),
+    Done(ClockResult),
     /// The chip hung (the watchdog fired) or panicked at this clock.
     Failed {
         panic: bool,
@@ -118,7 +121,7 @@ fn update(f: impl FnOnce(&mut Status)) {
 /// - 3: `MAGIC` in the top half, the clock being tried in bits 0 to 3
 ///   (`NONE` for none), bit 4 set by the panic handler.
 mod saved {
-    use super::Result;
+    use super::ClockResult;
     use tnc2_pico::watchdog::{scratch, set_scratch};
 
     const MAGIC: u32 = 0x7C2B_0000;
@@ -126,7 +129,7 @@ mod saved {
     const PANIC: u32 = 1 << 4;
 
     pub struct Saved {
-        pub results: [Option<Result>; 4],
+        pub results: [Option<ClockResult>; 4],
         pub trying: Option<usize>,
         pub panic: bool,
     }
@@ -151,7 +154,7 @@ mod saved {
         }
     }
 
-    pub fn record(i: usize, r: &Result) {
+    pub fn record(i: usize, r: &ClockResult) {
         let v = (r.z80_khz.clamp(1, 0x7FFF) | if r.hash_ok { 0x8000 } else { 0 }) << (16 * (i % 2));
         set_scratch(i / 2, scratch(i / 2) | v);
         let mhz = (r.counted_khz / 1000).saturating_sub(99).clamp(1, 255);
@@ -168,9 +171,10 @@ mod saved {
             let v = (scratch(i / 2) >> (16 * (i % 2))) & 0xFFFF;
             let mhz = (scratch(2) >> (8 * i)) & 0xFF;
             if v != 0 {
-                *r = Some(Result {
+                *r = Some(ClockResult {
                     counted_khz: (mhz + 99) * 1000,
                     z80_khz: v & 0x7FFF,
+                    mv: None,
                     ram_hash: None,
                     hash_ok: v & 0x8000 != 0,
                 });
@@ -193,6 +197,8 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 #[embassy_executor::main(executor = "embassy_rp::executor::Executor", entry = "cortex_m_rt::entry")]
 async fn main(spawner: Spawner) {
     ram_code::load();
+    // In case whatever ran before left the watchdog running.
+    watchdog::stop();
     heap::init();
     let p = embassy_rp::init(clock::config());
     let (console, status) = usb::start(spawner, p.USB);
@@ -244,9 +250,11 @@ async fn main(spawner: Spawner) {
         saved::record(i, &r);
         KICK.signal(());
     }
-    saved::trying(None);
+    // Still "trying" the last clock while dropping back, so a hang here
+    // restarts into the report rather than into a new test.
     clock::set(clock::STOCK).await;
     watchdog::stop();
+    saved::trying(None);
     update(|s| s.finished = true);
     KICK.signal(());
 }
@@ -254,8 +262,9 @@ async fn main(spawner: Spawner) {
 /// Boot a fresh board and run it for `SECONDS` emulated seconds in
 /// batches, timing only the batches. The sequence of `Board::run` calls is
 /// the same as `bench::run`'s, so the RAM hash at the end is comparable.
-async fn run_step(i: usize) -> Result {
+async fn run_step(i: usize) -> ClockResult {
     let counted_khz = clock::measure_sys_khz();
+    let mv = clock::core_mv();
     let mut board = Board::from_rom(ROM1, ROM2, &NodeConfig::default(), &BoardConfig::default()).expect("ROM images");
     let start_cycles = board.cycles();
     let mut elapsed_us = 0;
@@ -270,9 +279,10 @@ async fn run_step(i: usize) -> Result {
     let ram_hash = tnc2_core::rom::fingerprint(&board.ram()[..], &[]);
     let report =
         bench::Report { cycles: board.cycles() - start_cycles, elapsed_us, clock_hz: board.clock_hz(), ram_hash };
-    let r = Result {
+    let r = ClockResult {
         counted_khz,
         z80_khz: (report.emulated_mhz() * 1000.0) as u32,
+        mv: Some(mv),
         ram_hash: Some(ram_hash),
         hash_ok: ram_hash == HOST_HASH,
     };
@@ -348,7 +358,15 @@ fn report() -> String {
             State::Done(r) => {
                 let counted = r.counted_khz as f64 / 1000.0;
                 let z80 = r.z80_khz as f64 / 1000.0;
-                let _ = write!(o, "{counted:6.2}   {v}  {z80:6.3}   {:4.2}x  {:5.1}   ", r.ratio(), counted / z80);
+                // A voltage marked * was asked for, not read back.
+                let (mv, mark) = r.mv.map_or((step.mv, '*'), |mv| (mv, ' '));
+                let _ = write!(
+                    o,
+                    "{counted:6.2}   {}{mark} {z80:6.3}   {:4.2}x  {:5.1}   ",
+                    volts(mv),
+                    r.ratio(),
+                    counted / z80
+                );
                 match r.ram_hash {
                     Some(h) => write!(o, "{h:016x} "),
                     None => write!(o, "(before restart) "),
@@ -360,6 +378,9 @@ fn report() -> String {
             State::Skipped => write!(o, "-        {v}  not tried"),
         };
         let _ = write!(o, "\r\n");
+    }
+    if steps.iter().any(|s| matches!(s, State::Done(ClockResult { mv: None, .. }))) {
+        let _ = write!(o, "* the voltage asked for: that row is from before a restart.\r\n");
     }
     let _ = write!(o, "\r\n{}\r\n", verdict(&steps, finished));
     if late_panic {
