@@ -220,14 +220,14 @@ dependencies = [
 
 [[package]]
 name = "tnc2-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "rustzx-z80",
 ]
 
 [[package]]
 name = "tnc2-node"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "tnc2-core",
 ]

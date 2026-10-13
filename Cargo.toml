@@ -7,7 +7,7 @@ exclude = ["crates/tnc2-pico", "tools/m33bench", "tools/qemu-pace"]
 
 [package]
 name = "tnc2-emu"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 license = "AGPL-3.0-only"
 repository = "https://github.com/packethacking/tnc2-emu"
