@@ -23,7 +23,7 @@ mod radio;
 mod setup;
 
 use core::cell::RefCell;
-use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use core::sync::atomic::Ordering::Relaxed;
 use embassy_executor::Spawner;
 use embassy_rp::executor::Executor;
 use embassy_rp::interrupt::InterruptExt;
@@ -38,17 +38,8 @@ use tnc2_core::Board;
 use tnc2_node::handoff::{BoardSlot, Saver, Snapshot};
 use tnc2_node::pace::{Counters, Rates, Sample};
 use tnc2_node::pipe::{Consumer, Pipe, Producer};
-use tnc2_pico::clock::{self, Step};
+use tnc2_pico::clock;
 use tnc2_pico::{heap, usb, watchdog};
-
-/// The system clock, set once at start up. 250 MHz at 1.25 V is
-/// provisional: the speed test (docs/pico.md) has not run on a board yet,
-/// and its result (the lowest clock that is a GO, and the voltage it ran
-/// at) decides the final value. Change it here and nowhere else. If a
-/// switch to it ever fails part way, the next boot stays at the stock
-/// 150 MHz (core1_main).
-const SYS_CLOCK: Step = clock::STEPS[2];
-const _: () = assert!(SYS_CLOCK.mhz == 250 && SYS_CLOCK.mv == 1250);
 
 #[unsafe(link_section = ".bi_entries")]
 #[used]
@@ -84,8 +75,7 @@ const METER_SECS: u64 = 10;
 const WATCHDOG_US: u32 = 2_000_000;
 
 /// Why the chip last restarted, kept in watchdog scratch register 0
-/// (which survives the restart) as `MAGIC` and a code, and whether the
-/// clock switch was under way, in scratch register 1.
+/// (which survives the restart) as `MAGIC` and a code.
 mod reset {
     use embassy_rp::pac;
     use tnc2_pico::watchdog::{self, Reason, scratch, set_scratch};
@@ -94,7 +84,6 @@ mod reset {
     pub const PANIC_CORE0: u32 = 1;
     pub const PANIC_CORE1: u32 = 2;
     pub const CORE0_STALLED: u32 = 3;
-    const SWITCHING_CLOCK: u32 = 0x7E0C_0001;
 
     pub fn mark(code: u32) {
         set_scratch(0, MAGIC | code);
@@ -102,19 +91,6 @@ mod reset {
 
     pub fn clear() {
         set_scratch(0, 0);
-    }
-
-    /// Note that the clock is being switched, or has been.
-    pub fn switching_clock(on: bool) {
-        set_scratch(1, if on { SWITCHING_CLOCK } else { 0 });
-    }
-
-    /// Whether the chip restarted in the middle of the clock switch last
-    /// time, and start afresh.
-    pub fn clock_switch_failed() -> bool {
-        let s = scratch(1);
-        set_scratch(1, 0);
-        s == SWITCHING_CLOCK
     }
 
     /// What happened last time, in words, and start afresh.
@@ -153,10 +129,6 @@ mod reset {
     }
 }
 
-/// Set when the last boot restarted part way through the clock switch:
-/// this boot stays at the stock clock.
-pub static CLOCK_FELL_BACK: AtomicBool = AtomicBool::new(false);
-
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
     let core1 = embassy_rp::pac::SIO.cpuid().read() != 0;
@@ -192,9 +164,6 @@ fn tnc2_main() -> ! {
         unreachable!("MSPLIM is free at start up");
     }
     let reset = reset::last();
-    if reset::clock_switch_failed() {
-        CLOCK_FELL_BACK.store(true, Relaxed);
-    }
     heap::init();
     let p = embassy_rp::init(clock::config());
 
@@ -240,21 +209,7 @@ fn tnc2_main() -> ! {
 
 #[embassy_executor::task]
 async fn core1_main(spawner: Spawner, io: Core1) {
-    // The watchdog first, so that a clock switch that never finishes (a
-    // PLL that does not lock, say) restarts the chip.
     watchdog::start(WATCHDOG_US);
-    // The one clock change, before anything that depends on the system
-    // clock is set up. If the last boot restarted part way through it,
-    // stay at the stock clock this time (STATUS says so); the next start
-    // tries again. embassy-rp's own note of the clock still says 150 MHz
-    // afterwards; radio.rs works the PIO divider out from clock::current()
-    // instead, the UART runs from the 48 MHz USB PLL, and nothing else
-    // here reads it.
-    if !CLOCK_FELL_BACK.load(Relaxed) {
-        reset::switching_clock(true);
-        clock::set(SYS_CLOCK).await;
-        reset::switching_clock(false);
-    }
     spawner.spawn(feed_watchdog().expect("watchdog task"));
     spawner.spawn(meter().expect("meter task"));
     spawner.spawn(manager::run(io.saver).expect("manager task"));

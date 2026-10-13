@@ -5,9 +5,9 @@ The same untouched TheNet X1J EPROM, running on a Pico 2 W instead of in a conta
 There are two firmwares:
 
 - **The node** (`tnc2-pico-node.uf2`): a real TheNet node. This page is mostly about it.
-- **The speed test** (`tnc2-pico-speedtest.uf2`): measures whether a Pico 2 W keeps up with a real TNC-2, and at what clock. Nobody has run it on a board yet: if you have one, please do, because its answer decides the node's clock. How to run it and read the result: [pico-speedtest.md](pico-speedtest.md).
+- **The speed test** (`tnc2-pico-speedtest.uf2`): measures whether a Pico 2 W keeps up with a real TNC-2, and at what clock. It has now run on a real board; see [pico-speedtest.md](pico-speedtest.md) for the result and how to run it yourself.
 
-Nothing here has run on real hardware yet. Reports welcome.
+The node itself has not run on real hardware yet. Reports welcome.
 
 ## Wiring the NinoTNC
 
@@ -69,9 +69,9 @@ Flash wears out with erasing. Each save erases one slot (9 sectors of 4 KB), and
 
 ## The clock
 
-The node runs the Pico at 250 MHz with the core at 1.25 V, set once at start up. That is a provisional choice, with room to spare: 150 MHz is the RP2350's rated speed, and counting the emulator's instructions suggests real time needs somewhere between 103 and 140 MHz, so stock may well do. Once the speed test has run on real boards, the node will use the lowest clock it finds to be a GO, at the voltage it used. The setting is one constant, `SYS_CLOCK` in `crates/tnc2-pico/src/bin/node/main.rs`.
+The node runs the Pico at its stock 150 MHz, with no overclock and no change to the core voltage. The [speed test](pico-speedtest.md) on a real board found 150 MHz good for 1.32x real time, with room to spare, so there was no reason to ask for more.
 
-If the switch to 250 MHz ever fails part way (the chip restarts), the next start stays at 150 MHz and STATUS says so; the start after that tries again. If the Pico cannot keep up, the node still works, just slowly: its clock falls behind real time, and STATUS shows the speed (1.00x is real time) and how far behind it is.
+If the Pico cannot keep up, the node still works, just slowly: its clock falls behind real time, and STATUS shows the speed (1.00x is real time) and how far behind it is.
 
 ## Building
 
@@ -91,7 +91,7 @@ The firmware crate pins its own Rust version and target (`rust-toolchain.toml`, 
 - **Two cores.** Core 0 runs the Z80 and nothing else, with no interrupts. It runs the board in 1 ms slices of emulated time, each only once the hardware timer says real time has reached its end, so the node's clock never runs ahead; when it is behind (after a busy moment) it runs flat out until it has caught up. Core 1 does everything else with Embassy: both USB serial ports, the NinoTNC, the setup port and the flash.
 - **Between them**, lock free single producer, single consumer queues in SRAM: radio frames each way (core 1 does the KISS framing), console bytes each way. Core 0 checks them between slices. Core 1 hands over a whole new board when MYCALL or ALIAS changes, and asks for a copy of the RAM when it is time to save: core 0 copies the 32 KB between two slices and carries on.
 - **Everything runs from SRAM.** All the code and constants are copied from flash to SRAM at start up (`memory.x`); only the start up code and the EPROM images stay in flash. Code in flash is fetched through a 16 KB cache that the emulator alone would overflow, and while the flash is being erased or written it cannot be read at all. So core 0 keeps emulating while core 1 saves, and core 0's memory protection unit refuses to run code from flash, so a slip there shows up at once.
-- **The NinoTNC link.** The UART receives at 8N1 and a DMA channel empties it into a 16 KB ring, each byte with its error flags, so nothing is lost while core 1 is busy with the flash (an erase can take up to 0.4 s). A PIO state machine on GP20 sends with two stop bits; its timing is worked out from the clock constant.
+- **The NinoTNC link.** The UART receives at 8N1 and a DMA channel empties it into a 16 KB ring, each byte with its error flags, so nothing is lost while core 1 is busy with the flash (an erase can take up to 0.4 s). A PIO state machine on GP20 sends with two stop bits; its timing is worked out from the system clock.
 - **Watchdog.** If core 1 stops, or core 0 stops making progress, the watchdog restarts the chip within 2 seconds. STATUS says why the chip last restarted. The watchdog counts from the 12 MHz crystal, so it still works if the system clock does not. (embassy-rp's own watchdog driver is written for the RP2040 and gets the RP2350's reset selection wrong, so the firmware drives it directly.)
-- **Changing the clock while running** is something only the speed test does. embassy-rp sets the clocks once at start up; the firmware then raises the voltage, slows the flash interface to match, and moves the system PLL itself, from SRAM with interrupts off (`src/clock.rs`). The node does this once, before it sets anything up. USB has its own 48 MHz PLL, and the UART runs from it too, so neither moves with the system clock.
+- **Changing the clock while running** is something only the speed test does. embassy-rp sets the clocks once at start up, to the stock 150 MHz the node runs at; the firmware can also raise the voltage, slow the flash interface to match, and move the system PLL itself, from SRAM with interrupts off (`src/clock.rs`), which is how the speed test steps through its clocks. USB has its own 48 MHz PLL, and the UART runs from it too, so neither moves with the system clock.
 - **Flash layout.** The firmware may use the first 3840 KB of the 4 MB flash. The 252 KB after that is the store for the saved RAM and node settings. The last 4 KB is left alone, because UF2s from the Pico SDK write a workaround block there.

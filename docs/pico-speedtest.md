@@ -1,8 +1,8 @@
 # The Pico 2 W speed test
 
-TheNet never sleeps: it sits in a busy loop waiting for work, so a Pico 2 W running the node has to emulate the Z80 at the full 4.9152 MHz all the time. The speed test measures whether it can, and at what clock. Its answer decides the node's clock (`SYS_CLOCK`, see [pico.md](pico.md)), and nobody has run it on a board yet: if you have one, please do.
+TheNet never sleeps: it sits in a busy loop waiting for work, so a Pico 2 W running the node has to emulate the Z80 at the full 4.9152 MHz all the time. The speed test measures whether it can, and at what clock. Its result settled the node's clock, see [pico.md](pico.md#the-clock).
 
-It is a separate firmware, `tnc2-pico-speedtest.uf2`, with the same two USB serial ports as the node. The first only prints a note; the results are on the second. Building it is covered in [pico.md](pico.md#building).
+It is a separate firmware, the speed test, with the same two USB serial ports as the node. The first only prints a note; the results are on the second. Building it is covered in [pico.md](pico.md#building).
 
 ## Running the speed test
 
@@ -39,7 +39,28 @@ If a clock is too fast for the board, the chip may simply stop. A watchdog then 
 
 Please send the whole output, whatever it says.
 
-What we expect, from counting the instructions the emulator runs (no hardware has run it yet, see `tools/m33bench`): about 15 Arm instructions per Z80 clock cycle, which comes to somewhere between 103 and 140 MHz for real time. So 150 MHz should just about do, and the overclocks show how much room there is.
+What we expect, from counting the instructions the emulator runs (see `tools/m33bench`): about 15 Arm instructions per Z80 clock cycle, which comes to somewhere between 103 and 140 MHz for real time. The measured 23 cycles per Z80 clock, below, matches that estimate.
+
+## Results
+
+The first real board, October 2026:
+
+```
+tnc2-pico 0.2.0 speed test: TheNet X1J on an emulated 4.9152 MHz Z80
+Each clock runs the node from power on for 60 emulated seconds.
+103 KB of code and constants run from SRAM.
+
+clock    counted  core    Z80 MHz  ratio  cycles  RAM hash
+150 MHz  150.00   1.10 V   6.479   1.32x   23.2   ae7ab48fd2b132e4 matches
+200 MHz  200.00   1.15 V   8.639   1.76x   23.2   ae7ab48fd2b132e4 matches
+250 MHz  250.00   1.25 V  10.799   2.20x   23.2   ae7ab48fd2b132e4 matches
+300 MHz  300.00   1.30 V  12.959   2.64x   23.1   ae7ab48fd2b132e4 matches
+
+GO: fast enough, with room to spare, at 150 MHz (1.32x real time).
+Finished, at 150 MHz.
+```
+
+GO at the RP2350's stock 150 MHz, so that is what the node uses, see [pico.md](pico.md#the-clock).
 
 ## The clocks
 
